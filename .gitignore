@@ -1,0 +1,19 @@
+node_modules
+node_modules
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# API Keys
+OPENAI_API_KEY
+OPENAI_ORG_ID
+
+# Database Credentials
+DB_PASSWORD
+DB_USERNAME
+DB_CONNECTION_STRING
+DATABASE_URL
+
+# Environment variables
+.env.*.local

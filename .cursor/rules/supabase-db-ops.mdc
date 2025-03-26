@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Supabase Database and Data Handling Requirements
+globs: 
+alwaysApply: true
+---
+
+## Supabase Database Operations
+- Use Supabase PostgreSQL MCP server for all database operations
+- Use Supabase CLI
+- Create proper database schema with appropriate relationships
+- Utilize RLS (Row Level Security) for all tables that contain user data
+- Implement proper error handling for all Supabase operations
+- Use structured PostgreSQL queries rather than raw JSON storage
+- Leverage Supabase's built-in authentication when appropriate
+- Utilize PostgREST API for data access patterns
+
+## Supabase Data Protection
+- Never expose API keys in client-side code
+- Configure proper RLS policies for all tables
+- Use Supabase storage with appropriate bucket policies
+- Implement proper data validation before storage operations
+- Never delete or alter critical data without explicit confirmation
+- Back up data before major migrations or schema changes
+- Test database operations thoroughly in the development environment

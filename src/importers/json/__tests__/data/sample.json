@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "carrier": "ABC Insurance",
+      "policy_type": "auto",
+      "coverage_limits": 50000,
+      "premium": 1200.50,
+      "effective_date": "2024-01-01T00:00:00Z",
+      "expiration_date": "2024-12-31T23:59:59Z",
+      "status": "active",
+      "metadata": {
+        "vehicle_type": "sedan",
+        "vin": "1HGCM82633A123456"
+      }
+    },
+    {
+      "carrier": "XYZ Insurance",
+      "policy_type": "home",
+      "coverage_limits": 500000,
+      "premium": 2500.75,
+      "effective_date": "2024-02-01T00:00:00Z",
+      "expiration_date": "2025-01-31T23:59:59Z",
+      "status": "pending",
+      "metadata": {
+        "property_type": "single_family",
+        "square_feet": 2500
+      }
+    }
+  ]
+} 

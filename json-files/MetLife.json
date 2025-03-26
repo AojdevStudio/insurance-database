@@ -1,0 +1,41 @@
+{
+  "provider_name": "MetLife",
+  "processed_date": "2025-03-21T18:28:48.646723",
+  "total_documents": 2,
+  "documents": [
+    {
+      "filename": "MetLife Submission of Claims Policy (CT) R (1).pdf",
+      "metadata": {
+        "/Author": "LoPorto, Matthew",
+        "/CreationDate": "D:20201211165729-05'00'",
+        "/Creator": "Microsoft® Word for Office 365",
+        "/ModDate": "D:20210518133032-05'00'",
+        "/Producer": "Microsoft® Word for Office 365"
+      },
+      "total_pages": 1,
+      "pages": [
+        {
+          "page_number": 1,
+          "content": " \n \n \n \nMetLife Submission of Claims  Policy  \n \n \n \n \nSubmission of Claims : \n \nMetLife offers several ways to submit claims that can help you save time and energy, and may \nhelp control overhead costs.  \n \n• Electronic Claims  \n▪ Through your Practice Management System (PMS)  \n▪ Online via www.MetDental.com   \n▪ Web-based submission via clearinghouse  \n \n• Telephone via 1 -877-MET-DDS9 (638 -3379)   \n \n• By fax vis 1 -859-389-6505  \n \n• Mail claims to:   \nMetLife Dental Claims  \nP.O. Box 9812 82 \nEl Paso, TX 79998 -1282  \n \nSubmit your normal charges when sending claims to MetLife.  \n \nOur claims payment system will adjust the fees so that the Explanation of Benefits shows both \nthe submitted charge and the allowable charge. By submitting normal charge s, you help MetLife \nmaintain accurate data for reasonable and customary charges and your usual charge on our \nclaim payment system. When your usual charge for a procedure is lower than the plan \nallowance, your usual charge will become the maximum amount you  may bill a participant.  \n \nAlthough participants may not always inform your office of their participation in the program, \nMetLife’s claim payment system automatically recognizes both the dentist’s and the patient’s \nparticipation and determines applicable pl an allowances when the claim is processed.  \n \nMetLife dental consultants may review codes submitted and provide an alternative service to a \nsubmitted code when the alternative service more closely resembles the service rendered. \nParticipating dentists agree to the negotiated fee of the service that more closely resembles the \nservice rendered.  "
+        }
+      ]
+    },
+    {
+      "filename": "MetLife Utilization Review Policy (CT) (004) R.pdf",
+      "metadata": {
+        "/Author": "LoPorto, Matthew",
+        "/CreationDate": "D:20190417122639-04'00'",
+        "/Creator": "Microsoft® Word 2010",
+        "/ModDate": "D:20210518133131-05'00'",
+        "/Producer": "Microsoft® Word 2010"
+      },
+      "total_pages": 1,
+      "pages": [
+        {
+          "page_number": 1,
+          "content": " \n \n \n \nMetLife Utilization Review  Policy  \n \n \n \n \nUtilization Review:  \n \nProvider Utilization Profile (PUP) evaluation is a mandatory component of the selection and \nretention process. The Provider Utilization Profile System is a statistically based utilization \nreview system designed to identify dentists’ treatment patterns. Dentists whose practice \npatterns fall outside PUP guidelines or who fail to comply with PUP or program administrative \nprocedures may not be acceptable for initial or continued participation.  \n \nMetLife or its designated credentialing vendor performs Provider Utilization Profiling on all \napplicants from a national database maintained by the designated credentialing vendor. T his \ndatabase contains individual dental procedure utilization rates, defined as norms, and individual \nprovider utilization profiles. These norms are compared to the individual Provider’s Utilization \nProfile to determine which dentists are at a variance wit h the norm. A provider is determined to \nbe at a variance with a norm when the provider performs at least one of the measured \nprocedures at a rate that exceeds 85% of the other dentists in the area. If a profile meets \nMetLife guidelines, the provider will b e considered for participation; otherwise, he/she may be \ncounseled regarding changes that would allow him/her to be reconsidered.  \n \nA provider who does not demonstrate an acceptable Provider Utilization Profile may be selected \nfor participation at the discr etion of MetLife’s National Dental Director. This will be a provisional \nacceptance with MetLife Claim Review (MCR) applied for at least six months.  \n "
+        }
+      ]
+    }
+  ]
+}

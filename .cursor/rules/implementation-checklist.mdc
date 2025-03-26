@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+Description: Required Implementation Checklists
+Globs: *
+---
+
+# IMPLEMENTATION CHECKLISTS
+
+## Before Starting
+- [ ] Check stories.md for current task context
+- [ ] Used Sequential Thinking for analysis
+- [ ] Created/updated necessary documentation
+- [ ] Documented dependencies and versions
+- [ ] Identified performance requirements
+- [ ] Created test scenarios
+
+## During Implementation
+- [ ] Writing tests first
+- [ ] Following TypeScript best practices
+- [ ] Adding error handling
+- [ ] Including performance monitoring
+- [ ] Updating stories.md in real-time
+- [ ] Marking sub-tasks as completed
+
+## Before Completion
+- [ ] All tests passing
+- [ ] Coverage requirements met (80% minimum)
+- [ ] Performance requirements verified
+- [ ] stories.md updated with completion status
+- [ ] Technical decisions documented
+- [ ] All sub-tasks marked as complete

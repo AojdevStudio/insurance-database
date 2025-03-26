@@ -1,0 +1,377 @@
+/* global console, process */
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs/promises';
+import path from 'path';
+import Ajv from 'ajv';
+
+// Initialize JSON schema validator
+const ajv = new Ajv();
+
+const jsonSchema = {
+  type: 'object',
+  required: ['provider_name', 'documents'],
+  properties: {
+    provider_name: { type: 'string' },
+    documents: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['filename', 'total_pages'],
+        properties: {
+          filename: { type: 'string' },
+          total_pages: { type: 'integer', minimum: 0 },
+          metadata: { 
+            type: 'object',
+            additionalProperties: true
+          },
+          pages: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['page_number', 'content'],
+              properties: {
+                page_number: { type: 'integer', minimum: 1 },
+                content: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+const validateJson = ajv.compile(jsonSchema);
+
+// Initialize Supabase client for API
+const supabaseUrl = 'http://localhost:54321';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+// Database connection management
+let supabaseClient = null;
+
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+}
+
+// File processing state management
+const STATE_FILE = '.processing_state.json';
+
+async function loadProcessingState() {
+  try {
+    const state = await fs.readFile(STATE_FILE, 'utf-8');
+    return JSON.parse(state);
+  } catch {
+    return { processedFiles: [], lastProcessedTime: null };
+  }
+}
+
+async function updateProcessingState(filename) {
+  const state = await loadProcessingState();
+  state.processedFiles.push(filename);
+  state.lastProcessedTime = new Date().toISOString();
+  await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+// Carrier operations
+async function getOrCreateCarrier(carrierName) {
+  const supabase = getSupabaseClient();
+  
+  const { data: carrier, error: carrierFetchError } = await supabase
+    .from('insurance_carriers')
+    .select('id')
+    .eq('name', carrierName)
+    .single();
+
+  if (carrierFetchError && carrierFetchError.code !== 'PGRST116') {
+    throw carrierFetchError;
+  }
+
+  if (!carrier) {
+    const { data: newCarrier, error: carrierError } = await supabase
+      .from('insurance_carriers')
+      .insert({ name: carrierName })
+      .select()
+      .single();
+
+    if (carrierError) {
+      throw new Error(`Error creating carrier ${carrierName}: ${carrierError.message}`);
+    }
+    return newCarrier;
+  }
+
+  return carrier;
+}
+
+// Document operations
+async function processDocument(carrier, doc) {
+  const supabase = getSupabaseClient();
+  console.log(`Processing document: ${doc.filename}`);
+
+  // Check if document exists
+  const { data: existingDoc, error: docFetchError } = await supabase
+    .from('carrier_documents')
+    .select('id')
+    .eq('carrier_id', carrier.id)
+    .eq('filename', doc.filename)
+    .single();
+
+  if (docFetchError && docFetchError.code !== 'PGRST116') {
+    throw docFetchError;
+  }
+
+  let documentId;
+  if (existingDoc) {
+    documentId = await updateDocument(existingDoc.id, doc);
+  } else {
+    documentId = await createDocument(carrier.id, doc);
+  }
+
+  await processPages(documentId, doc.pages);
+  await processProcedures(documentId, doc.pages);
+}
+
+async function updateDocument(docId, doc) {
+  const supabase = getSupabaseClient();
+  const { error: updateError } = await supabase
+    .from('carrier_documents')
+    .update({
+      metadata: doc.metadata || {},
+      total_pages: doc.total_pages || 0,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', docId);
+
+  if (updateError) {
+    throw new Error(`Error updating document ${doc.filename}: ${updateError.message}`);
+  }
+  return docId;
+}
+
+async function createDocument(carrierId, doc) {
+  const supabase = getSupabaseClient();
+  const { data: newDoc, error: insertError } = await supabase
+    .from('carrier_documents')
+    .insert({
+      carrier_id: carrierId,
+      filename: doc.filename,
+      metadata: doc.metadata || {},
+      total_pages: doc.total_pages || 0
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    throw new Error(`Error inserting document ${doc.filename}: ${insertError.message}`);
+  }
+  return newDoc.id;
+}
+
+// Page operations
+async function processPages(documentId, pages) {
+  if (!pages || !Array.isArray(pages)) return;
+
+  const supabase = getSupabaseClient();
+  
+  // Delete existing pages
+  const { error: deleteError } = await supabase
+    .from('document_pages')
+    .delete()
+    .eq('document_id', documentId);
+
+  if (deleteError) {
+    throw new Error(`Error deleting existing pages: ${deleteError.message}`);
+  }
+
+  // Batch insert new pages
+  const pagesToInsert = pages.map(page => ({
+    document_id: documentId,
+    page_number: page.page_number,
+    content: page.content
+  }));
+
+  const { error: insertError } = await supabase
+    .from('document_pages')
+    .insert(pagesToInsert);
+
+  if (insertError) {
+    throw new Error(`Error inserting pages: ${insertError.message}`);
+  }
+}
+
+// Procedure operations
+async function processProcedures(documentId, pages) {
+  if (!pages) return;
+
+  const supabase = getSupabaseClient();
+  
+  // Delete existing procedures
+  const { error: deleteError } = await supabase
+    .from('document_procedures')
+    .delete()
+    .eq('document_id', documentId);
+
+  if (deleteError) {
+    throw new Error(`Error deleting procedures: ${deleteError.message}`);
+  }
+
+  // Extract and batch insert new procedures
+  const procedures = extractProcedures(pages);
+  const proceduresToInsert = procedures.map(proc => ({
+    document_id: documentId,
+    procedure_code: proc.code,
+    description: proc.description,
+    submission_requirements: proc.requirements,
+    documentation_required: proc.requiresDocumentation
+  }));
+
+  const { error: insertError } = await supabase
+    .from('document_procedures')
+    .insert(proceduresToInsert);
+
+  if (insertError) {
+    throw new Error(`Error inserting procedures: ${insertError.message}`);
+  }
+}
+
+// Main processing functions
+async function processJsonFile(file) {
+  try {
+    console.log(`Processing ${file}...`);
+    const content = await fs.readFile(path.join('./json-files', file), 'utf-8');
+    const data = JSON.parse(content);
+
+    // Validate JSON structure
+    if (!validateJson(data)) {
+      const errors = validateJson.errors.map(err => 
+        `${err.instancePath} ${err.message}`
+      ).join('\n');
+      throw new Error(`Invalid JSON format in ${file}:\n${errors}`);
+    }
+
+    const carrier = await getOrCreateCarrier(data.provider_name);
+    
+    for (const doc of data.documents) {
+      try {
+        await processDocument(carrier, doc);
+      } catch (docError) {
+        console.error(`Error processing document ${doc.filename}:`, docError);
+        // Continue with next document
+      }
+    }
+
+    await updateProcessingState(file);
+    console.log(`Completed processing ${file}`);
+  } catch (error) {
+    console.error(`Error processing file ${file}:`, error);
+    throw error; // Re-throw to handle in main function
+  }
+}
+
+async function processJsonFiles() {
+  try {
+    const state = await loadProcessingState();
+    const files = await fs.readdir('./json-files');
+    
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      
+      if (state.processedFiles.includes(file)) {
+        console.log(`Skipping already processed file: ${file}`);
+        continue;
+      }
+
+      await processJsonFile(file);
+    }
+
+    console.log('All JSON data processed successfully');
+  } catch (error) {
+    console.error('Error processing JSON files:', error);
+    process.exit(1);
+  }
+}
+
+function extractProcedures(pages) {
+  const procedures = new Map(); // Use Map to deduplicate procedures by code
+  const codePattern = /\b(D\d{4})\b/g;
+  const docRequiredPattern = /\b(?:documentation\s+required|documentation\s+needed)\b/i;
+  
+  for (const page of pages) {
+    const content = page.content;
+    const lines = content.split('\n');
+    
+    let currentProcedure = null;
+    let buffer = [];
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+
+      // Look for procedure codes
+      const codeMatch = trimmedLine.match(codePattern);
+      
+      if (codeMatch) {
+        // Save previous procedure if exists
+        if (currentProcedure) {
+          finalizeProcedure(currentProcedure, buffer, procedures);
+        }
+
+        // Start new procedure
+        currentProcedure = {
+          code: codeMatch[0],
+          description: '',
+          requirements: '',
+          requiresDocumentation: false
+        };
+        
+        // Remove code from line for further processing
+        buffer = [trimmedLine.replace(codePattern, '').trim()];
+      } else if (currentProcedure) {
+        // Check if line contains documentation requirements
+        if (docRequiredPattern.test(trimmedLine)) {
+          currentProcedure.requiresDocumentation = true;
+          const reqContent = trimmedLine.replace(docRequiredPattern, '').trim();
+          if (reqContent) {
+            currentProcedure.requirements = reqContent;
+          }
+        } else if (!trimmedLine.match(/^D\d{4}\s/)) {
+          // Add line to buffer if it's not a new procedure code
+          buffer.push(trimmedLine);
+        }
+      }
+    }
+
+    // Don't forget to save the last procedure
+    if (currentProcedure) {
+      finalizeProcedure(currentProcedure, buffer, procedures);
+    }
+  }
+
+  return Array.from(procedures.values());
+}
+
+function finalizeProcedure(procedure, buffer, procedures) {
+  // Join buffer lines and clean up the text
+  const text = buffer.join(' ').replace(/\s+/g, ' ').trim();
+  
+  // Split text into description and requirements if not already set
+  if (!procedure.requirements && text.toLowerCase().includes('documentation required')) {
+    const [desc, ...reqs] = text.split(/documentation required/i);
+    procedure.description = desc.trim();
+    procedure.requirements = reqs.join(' ').trim();
+    procedure.requiresDocumentation = true;
+  } else if (!procedure.requirements) {
+    procedure.description = text;
+  }
+
+  // Store in map, potentially overwriting duplicate codes with better data
+  if (procedure.description || procedure.requirements) {
+    procedures.set(procedure.code, procedure);
+  }
+}
+
+// Run the processing
+processJsonFiles(); 

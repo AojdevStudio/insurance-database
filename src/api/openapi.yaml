@@ -1,0 +1,838 @@
+openapi: 3.0.3
+info:
+  title: Insurance Database API
+  description: |
+    API for accessing and managing insurance carrier information, procedures, and guidelines.
+    Provides comprehensive search capabilities including semantic search for guidelines.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: /api
+    description: API base URL
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    Carrier:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the carrier
+        name:
+          type: string
+          description: Name of the insurance carrier
+        code:
+          type: string
+          nullable: true
+          description: Carrier code identifier
+        contact_info:
+          type: object
+          nullable: true
+          properties:
+            phone:
+              type: string
+              description: Contact phone number
+            email:
+              type: string
+              description: Contact email address
+            address:
+              type: string
+              description: Physical address
+        website:
+          type: string
+          nullable: true
+          description: Carrier's website URL
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - name
+        - created_at
+
+    CarrierListResponse:
+      type: object
+      properties:
+        carriers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Carrier'
+        total:
+          type: integer
+          description: Total number of carriers
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Number of items per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+      required:
+        - carriers
+        - total
+        - page
+        - limit
+        - total_pages
+
+    Procedure:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the procedure
+        code:
+          type: string
+          description: Procedure code (e.g., CPT code)
+          pattern: ^[A-Z0-9]{5}$
+        description:
+          type: string
+          description: Description of the procedure
+        category:
+          type: string
+          nullable: true
+          description: Procedure category
+        subcategory:
+          type: string
+          nullable: true
+          description: Procedure subcategory
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - code
+        - description
+        - created_at
+
+    ProcedureRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the requirement
+        carrier_id:
+          type: integer
+          description: ID of the insurance carrier
+        procedure_id:
+          type: integer
+          description: ID of the procedure
+        requirements:
+          type: object
+          description: Carrier-specific requirements for the procedure
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - carrier_id
+        - procedure_id
+        - requirements
+        - created_at
+
+    DocumentationRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the documentation requirement
+        carrier_id:
+          type: integer
+          description: ID of the insurance carrier
+        procedure_id:
+          type: integer
+          description: ID of the procedure
+        requirements:
+          type: array
+          items:
+            type: string
+          description: List of required documentation
+        examples:
+          type: array
+          items:
+            type: string
+          description: Example documentation references
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - carrier_id
+        - procedure_id
+        - requirements
+        - examples
+        - created_at
+
+    ProcedureWithRequirements:
+      allOf:
+        - $ref: '#/components/schemas/Procedure'
+        - type: object
+          properties:
+            carrier_requirements:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProcedureRequirement'
+            documentation_requirements:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentationRequirement'
+
+    ProcedureListResponse:
+      type: object
+      properties:
+        procedures:
+          type: array
+          items:
+            $ref: '#/components/schemas/Procedure'
+        total:
+          type: integer
+          description: Total number of procedures
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Number of items per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+      required:
+        - procedures
+        - total
+        - page
+        - limit
+        - total_pages
+
+    Guideline:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the guideline
+        carrier_id:
+          type: integer
+          description: ID of the insurance carrier
+        title:
+          type: string
+          description: Title of the guideline
+        content:
+          type: string
+          description: Full content of the guideline
+        category:
+          type: string
+          nullable: true
+          description: Guideline category
+        metadata:
+          type: object
+          nullable: true
+          description: Additional metadata for the guideline
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - carrier_id
+        - title
+        - content
+        - created_at
+
+    SearchScoreExplanation:
+      type: object
+      properties:
+        text_rank:
+          type: number
+          description: Rank in text search results
+        vector_rank:
+          type: number
+          description: Rank in vector search results
+        text_contribution:
+          type: number
+          description: Contribution from text similarity
+        vector_contribution:
+          type: number
+          description: Contribution from vector similarity
+
+    GuidelineSearchResult:
+      allOf:
+        - $ref: '#/components/schemas/Guideline'
+        - type: object
+          properties:
+            text_similarity:
+              type: number
+              description: Text-based similarity score
+            vector_similarity:
+              type: number
+              description: Vector-based similarity score
+            combined_similarity:
+              type: number
+              description: Combined similarity score for hybrid search
+            rrf_score:
+              type: number
+              description: Reciprocal Rank Fusion score
+            explanation:
+              $ref: '#/components/schemas/SearchScoreExplanation'
+
+    GuidelineSearchResponse:
+      type: object
+      properties:
+        guidelines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuidelineSearchResult'
+        total:
+          type: integer
+          description: Total number of guidelines
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Number of items per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+      required:
+        - guidelines
+        - total
+        - page
+        - limit
+        - total_pages
+
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Error message
+                  code:
+                    type: string
+                    description: Error code
+                  details:
+                    type: object
+                    description: Additional error details
+                required:
+                  - message
+                  - code
+
+    ValidationError:
+      description: Validation error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Validation failed"
+                  code:
+                    type: string
+                    example: "VALIDATION_ERROR"
+                  details:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: string
+                required:
+                  - message
+                  - code
+                  - details
+
+    RateLimitError:
+      description: Rate limit exceeded error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again after 2024-03-25T10:00:00.000Z"
+                  code:
+                    type: string
+                    example: "RATE_LIMIT_ERROR"
+                required:
+                  - message
+                  - code
+
+  parameters:
+    page:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    
+    limit:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    sortBy:
+      name: sort_by
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum: [name, created_at]
+        default: name
+    
+    sortOrder:
+      name: sort_order
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    
+    searchQuery:
+      name: query
+      in: query
+      description: Search query string
+      schema:
+        type: string
+    
+    category:
+      name: category
+      in: query
+      description: Filter procedures by category
+      schema:
+        type: string
+    
+    procedureCode:
+      name: code
+      in: path
+      required: true
+      description: Procedure code (5 characters, alphanumeric)
+      schema:
+        type: string
+        pattern: ^[A-Z0-9]{5}$
+    
+    carrierId:
+      name: carrier_id
+      in: query
+      description: Filter requirements by carrier ID
+      schema:
+        type: integer
+        minimum: 1
+
+    searchType:
+      name: search_type
+      in: query
+      description: Type of search to perform
+      schema:
+        type: string
+        enum: [text, semantic, hybrid, rrf_hybrid]
+        default: semantic
+
+    minSimilarity:
+      name: min_similarity
+      in: query
+      description: Minimum similarity threshold for search results
+      schema:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.7
+
+    textWeight:
+      name: text_weight
+      in: query
+      description: Weight for text similarity in hybrid search
+      schema:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.3
+
+    vectorWeight:
+      name: vector_weight
+      in: query
+      description: Weight for vector similarity in hybrid search
+      schema:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.7
+
+    rrfK:
+      name: rrf_k
+      in: query
+      description: K parameter for RRF hybrid search
+      schema:
+        type: number
+        minimum: 1
+        default: 60.0
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the API's current health status
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /carriers:
+    get:
+      summary: List all carriers
+      description: Retrieve a paginated list of insurance carriers
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: Successfully retrieved carriers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarrierListResponse'
+              example:
+                carriers:
+                  - id: 1
+                    name: "Blue Cross Blue Shield"
+                    code: "BCBS"
+                    contact_info:
+                      phone: "1-800-123-4567"
+                      email: "contact@bcbs.com"
+                      address: "123 Healthcare Ave"
+                    website: "https://www.bcbs.com"
+                    created_at: "2024-03-24T12:00:00Z"
+                total: 100
+                page: 1
+                limit: 20
+                total_pages: 5
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /carriers/search:
+    get:
+      summary: Search carriers
+      description: Search for carriers by name with pagination and sorting
+      parameters:
+        - $ref: '#/components/parameters/searchQuery'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: Successfully retrieved search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarrierListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /carriers/{id}:
+    get:
+      summary: Get carrier by ID
+      description: Retrieve detailed information about a specific carrier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Carrier ID
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Successfully retrieved carrier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Carrier'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '404':
+          description: Carrier not found
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /procedures:
+    get:
+      summary: List procedures
+      description: Retrieve a paginated list of procedures with optional filtering
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/category'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: Successfully retrieved procedures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcedureListResponse'
+              example:
+                procedures:
+                  - id: 1
+                    code: "A1234"
+                    description: "Sample medical procedure"
+                    category: "Surgery"
+                    subcategory: "General"
+                    created_at: "2024-03-24T12:00:00Z"
+                total: 100
+                page: 1
+                limit: 20
+                total_pages: 5
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /procedures/search:
+    get:
+      summary: Search procedures
+      description: Search procedures by code or description
+      parameters:
+        - $ref: '#/components/parameters/searchQuery'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/category'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: Successfully retrieved search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcedureListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /procedures/{code}:
+    get:
+      summary: Get procedure by code
+      description: Retrieve detailed information about a specific procedure including requirements
+      parameters:
+        - $ref: '#/components/parameters/procedureCode'
+      responses:
+        '200':
+          description: Successfully retrieved procedure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcedureWithRequirements'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '404':
+          description: Procedure not found
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /procedures/{code}/requirements:
+    get:
+      summary: Get procedure requirements
+      description: Retrieve requirements for a specific procedure, optionally filtered by carrier
+      parameters:
+        - $ref: '#/components/parameters/procedureCode'
+        - $ref: '#/components/parameters/carrierId'
+      responses:
+        '200':
+          description: Successfully retrieved procedure requirements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    procedure_code:
+                      type: string
+                    carrier_id:
+                      type: integer
+                    carrier_name:
+                      type: string
+                    requirements:
+                      type: object
+                    documentation:
+                      type: array
+                      items:
+                        type: string
+                    examples:
+                      type: array
+                      items:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '404':
+          description: No requirements found for procedure
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /guidelines/search:
+    get:
+      summary: Search guidelines
+      description: |
+        Search guidelines using various methods:
+        - Text search: Uses trigram similarity
+        - Semantic search: Uses OpenAI embeddings
+        - Hybrid search: Combines text and semantic search
+        - RRF hybrid: Uses Reciprocal Rank Fusion
+      parameters:
+        - $ref: '#/components/parameters/searchQuery'
+        - $ref: '#/components/parameters/searchType'
+        - $ref: '#/components/parameters/carrierId'
+        - $ref: '#/components/parameters/category'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/minSimilarity'
+        - $ref: '#/components/parameters/textWeight'
+        - $ref: '#/components/parameters/vectorWeight'
+        - $ref: '#/components/parameters/rrfK'
+      responses:
+        '200':
+          description: Successfully retrieved search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidelineSearchResponse'
+              example:
+                guidelines:
+                  - id: 1
+                    carrier_id: 1
+                    title: "Prior Authorization Guidelines"
+                    content: "Detailed guidelines for prior authorization..."
+                    category: "Authorization"
+                    metadata:
+                      effective_date: "2024-01-01"
+                      version: "1.0"
+                    created_at: "2024-03-24T12:00:00Z"
+                    text_similarity: 0.85
+                    vector_similarity: 0.92
+                    combined_similarity: 0.90
+                    rrf_score: 0.033
+                    explanation:
+                      text_rank: 1
+                      vector_rank: 1
+                      text_contribution: 0.0164
+                      vector_contribution: 0.0164
+                total: 100
+                page: 1
+                limit: 20
+                total_pages: 5
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /guidelines/semantic-search:
+    get:
+      summary: Semantic search guidelines
+      description: Search guidelines using OpenAI embeddings for semantic similarity
+      parameters:
+        - $ref: '#/components/parameters/searchQuery'
+        - $ref: '#/components/parameters/carrierId'
+        - $ref: '#/components/parameters/category'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/minSimilarity'
+      responses:
+        '200':
+          description: Successfully retrieved semantic search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidelineSearchResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Unauthorized - Invalid API key
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/Error' 

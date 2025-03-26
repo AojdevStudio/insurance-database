@@ -1,0 +1,6 @@
+carrierName,policyType,coverageDetails,effectiveDate,expirationDate,premium,status
+ABC Insurance,Auto,Comprehensive Coverage,2024-01-01,2024-12-31,1200.50,Active
+XYZ Insurance,Home,Basic Coverage,2024-02-01,2025-01-31,850.75,Active
+DEF Insurance,Life,Term Life 20 Years,2024-03-01,2044-02-28,2500.00,Pending
+GHI Insurance,Health,Family Plan,2024-01-15,2024-12-31,3750.25,Active
+Invalid Insurance,,Missing Details,2024-01-01,2023-12-31,-100.00,Unknown 

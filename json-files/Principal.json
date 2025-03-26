@@ -1,0 +1,30 @@
+{
+  "provider_name": "Principal",
+  "processed_date": "2025-03-21T18:28:48.667680",
+  "total_documents": 1,
+  "documents": [
+    {
+      "filename": "Principal Portal.pdf",
+      "metadata": {
+        "/Author": "Dercher, Crystal",
+        "/Comments": "",
+        "/Company": "GEHA, Inc.",
+        "/CreationDate": "D:20250226183923-06'00'",
+        "/Creator": "Acrobat PDFMaker 24 for Word",
+        "/Keywords": "",
+        "/ModDate": "D:20250226183926-06'00'",
+        "/Producer": "Adobe PDF Library 24.5.197",
+        "/SourceModified": "D:20250227003840",
+        "/Subject": "",
+        "/Title": ""
+      },
+      "total_pages": 1,
+      "pages": [
+        {
+          "page_number": 1,
+          "content": "Below is a link to Principal's provider portal training videos. These videos offer guidance on registration, accessing the portal, and utilizing its features. Training Videos: How to view plan information. The \"How to View Plan Information\" video specifically demonstrates how to identify the network utilized."
+        }
+      ]
+    }
+  ]
+}

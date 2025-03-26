@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "mcp-supabase": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@Deploya-labs/mcp-supabase",
+        "--key",
+        "07ec6fcb-49ec-4c8d-9eb1-40cccaef8fe4"
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+Description: Development Workflow and Documentation Standards
+Globs: *
+---
+
+# DEVELOPMENT WORKFLOW
+
+## Document Priority System
+- PRIMARY: stories.md - Main task tracking, update in REAL-TIME
+- TECHNICAL: instructions.md - Implementation details, update on decisions
+- LOGS: logs.md - Event logging, update on milestones
+
+## Status Marking
+- Complete: [x]
+- In Progress: [-]
+- Pending: [ ]
+
+## Required Implementation Process
+1. ANALYSIS PHASE
+   - Use Sequential Thinking tool for breakdown
+   - Check stories.md for context
+   - Identify current story and sub-tasks
+   - Update stories.md in real-time
+
+2. IMPLEMENTATION GUIDELINES
+   - Create minimal, focused files (max 200 lines)
+   - Add error handling for ALL external calls
+   - Include proper type definitions
+   - Add JSDoc comments for ALL public functions
+   - Update stories.md after each component completion
+
+3. TESTING REQUIREMENTS
+   - Write unit tests FIRST
+   - Test ALL error handling paths
+   - Verify performance meets requirements
+   - Achieve minimum 80% branch coverage

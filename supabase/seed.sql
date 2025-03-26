@@ -1,0 +1,2 @@
+-- This file is intentionally empty.
+-- Data seeding will be handled by the Node.js script instead 

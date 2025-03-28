@@ -14,12 +14,18 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "process-json": "ts-node src/scripts/process-json.ts",
-    "process-json:build": "node dist/scripts/process-json.js"
+    "process-json:build": "node dist/scripts/process-json.js",
+    "prisma:pull": "prisma db pull",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format",
+    "db:pull-generate": "npm run prisma:pull && npm run prisma:generate"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.5.0",
     "@supabase/supabase-js": "^2.49.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
@@ -55,6 +61,7 @@
     "@typescript-eslint/parser": "^7.1.0",
     "eslint": "^8.57.0",
     "jest": "^29.7.0",
+    "prisma": "^6.5.0",
     "supabase": "^2.20.3",
     "supertest": "^7.1.0",
     "ts-jest": "^29.1.2",

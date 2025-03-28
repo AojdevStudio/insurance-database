@@ -1,4 +1,3 @@
-
 **Your Integration Pattern:**
 
 *   **Database Querying & Modeling:** Prisma
@@ -143,24 +142,51 @@
 
 *For each relevant service (e.g., `CarrierService`, `DocumentImportService`, `GuidelineService`, `ProcedureService`):*
 
-1.  **Identify Data Access:** Locate all methods currently using `supabase.from(...)`, `supabase.rpc(...)`, etc., for database operations targeted for Prisma migration.
+1.  [X] **Identify Data Access:** Locate all methods currently using `supabase.from(...)`, `supabase.rpc(...)`, etc., for database operations targeted for Prisma migration.
+
 2.  **Method-by-Method Refactoring (CarrierService):**
     *   [X] **Choose a Method:** Start with a simple query method (e.g., `getCarrierById`).
     *   [X] **Translate Query:** Rewrite the Supabase query using Prisma Client syntax (e.g., `prisma.insuranceCarrier.findUnique(...)`). Use `include` for relations instead of manual joins.
     *   [X] **Update Types:** Change function signatures and return types to use Prisma's generated types (e.g., `Prisma.PromiseReturnType<typeof prisma.insuranceCarrier.findUnique>`).
     *   [X] **Handle Errors:** Adapt error handling for Prisma-specific errors (`PrismaClientKnownRequestError`, etc.).
     *   [X] **Refactor Complex Logic:** For pagination, sorting, and database operations. Implemented listCarriers, searchCarriers, and getCarrierById.
-    *   [ ] **Vector Search:** For semantic search (`GuidelineService`), use `prisma.$queryRaw` or `prisma.$executeRaw` to call your PostgreSQL `match_guidelines` or similar functions, passing the embedding vector. Map the raw results back to typed objects.
-3.  **Unit Testing:**
-    *   [X] Write unit tests for *each refactored method* in CarrierService.
-    *   [X] Mock the Prisma Client instance (using `jest.mock`) to isolate service logic.
-4.  **Performance Comparison (Key Methods):**
+
+3.  **Method-by-Method Refactoring (ProcedureService):**
+    *   [X] **Implement Methods:** Created PrismaProcedureService with methods:
+        *   [X] listProcedures
+        *   [X] searchProcedures
+        *   [X] getProcedureByCode
+        *   [X] getProcedureRequirements
+    *   [X] **Handle Relations:** Used Prisma's `include` to fetch related requirements
+
+4.  **Method-by-Method Refactoring (GuidelineService):**
+    *   [X] **Implement Basic Methods:** Created PrismaGuidelineService with:
+        *   [X] searchGuidelines
+    *   [X] **Vector Search Implementation:** Used `prisma.$queryRaw` for specialized vector search methods:
+        *   [X] semanticSearch
+        *   [X] textSearch
+        *   [X] hybridSearch
+        *   [X] rrf_hybridSearch
+    *   [X] **Maintained Redis Caching:** Integrated with existing Redis caching for performance
+
+5.  **Unit Testing:**
+    *   [X] Write unit tests for each refactored service:
+        *   [X] CarrierService tests
+        *   [X] ProcedureService tests
+        *   [X] GuidelineService tests
+    *   [X] Mock the Prisma Client instance (using `jest.mock`) to isolate service logic
+
+6.  **Performance Comparison (Key Methods):**
     *   [ ] Before deleting the old Supabase client code for a *critical* query, benchmark its performance.
     *   [ ] Benchmark the new Prisma version of the same query.
     *   [ ] Document any significant differences (positive or negative). Address regressions in the Optimization phase.
-5.  **Documentation:**
-    *   [X] Add comprehensive JSDoc/TSDoc comments for all refactored methods in PrismaCarrierService.
-    *   [X] Update Prisma migration progress documentation to track completed work.
+
+7.  **Documentation:**
+    *   [X] Add comprehensive JSDoc/TSDoc comments for all refactored service methods
+    *   [X] Update Prisma migration progress documentation to track completed work:
+        *   [X] Created detailed documentation in docs/development/prisma-phase4-completion.md
+        *   [X] Updated CHANGELOG.md
+        *   [X] Updated README.md
 
 ---
 
@@ -170,7 +196,10 @@
 
 1.  **Controller Updates:**
     *   *For each controller using a migrated service:*
-        *   [X] Update service calls to use the new/refactored Prisma-based methods (Created PrismaCarrierController).
+        *   [X] Update service calls to use the new/refactored Prisma-based methods:
+            *   [X] Created PrismaCarrierController
+            *   [X] Created PrismaProcedureController
+            *   [X] Created PrismaGuidelinesController
         *   [X] Adjust data transformation logic for the structure returned by the Prisma service.
         *   [X] Verify response formatting and error handling.
 2.  **Middleware Updates:**
@@ -184,7 +213,10 @@
     *   [ ] **Caching (`src/middleware/cache.ts`):** Verify cache keys and invalidation logic still work correctly with data structures potentially returned by Prisma services.
 
 3.  **Integration Testing (API Level):**
-    *   [X] Set up new API routes for testing Prisma implementation (`/api/prisma/carriers/`).
+    *   [X] Set up new API routes for testing Prisma implementation:
+        *   [X] `/api/prisma/carriers/`
+        *   [X] `/api/prisma/procedures/`
+        *   [X] `/api/prisma/guidelines/`
     *   [ ] Re-run existing API integration tests (`tests/integration`). Update tests that fail due to changed response structures or error handling.
     *   [ ] Add new integration tests specifically targeting endpoints heavily reliant on Prisma (e.g., complex relation queries, transaction-based imports).
 
@@ -237,9 +269,9 @@
     *   [X] Update JSDoc/TSDoc comments for services/methods using Prisma Client.
     *   [ ] Add comments in `schema.prisma`.
 2.  **READMEs/Guides:**
-    *   [ ] Update `README.md` and any development guides (`docs/*.md`).
-    *   [ ] **Crucially:** Document the decided Schema Management Workflow (SQL -> `db pull` -> `generate`).
-    *   [ ] Document the Prisma + Supabase integration pattern (what each tool is used for).
+    *   [X] Update `README.md` and any development guides (`docs/*.md`).
+    *   [X] **Crucially:** Document the decided Schema Management Workflow (SQL -> `db pull` -> `generate`).
+    *   [X] Document the Prisma + Supabase integration pattern (what each tool is used for).
     *   [ ] Add a Prisma "Cookbook" section in docs with examples of common queries specific to this project.
 3.  **API Documentation:**
     *   [ ] Update OpenAPI spec (`src/api/openapi.yaml`) if response structures changed. Add Prisma-specific error codes if relevant.
@@ -267,6 +299,7 @@
 **Goal:** Ensure core application features function correctly using the newly integrated Prisma services. Migrate any remaining feature-specific data access logic.
 
 1.  **Advanced Search Features:**
+    *   [X] **Vector Search:** Implemented using prisma.$queryRaw for semantic search functionality
     *   [ ] **Fuzzy Name Matching:** Review/Implement carrier name fuzzy matching. If using database functions (like trigrams via `pg_trgm`), ensure they are called correctly using `prisma.$queryRaw`. If implementing in application logic, use Prisma to fetch potential candidates first.
     *   [ ] **Full-Text Search:** Verify existing PostgreSQL full-text search indexes are utilized via Prisma, possibly using raw queries (`$queryRaw`) or specific Prisma full-text search capabilities if applicable to your version/preview features.
     *   [ ] **Procedure Code Search:** Ensure procedure code searches (including wildcards if needed) are efficient using Prisma (`contains`, `startsWith`, `endsWith` or `$queryRaw` for more complex patterns).
@@ -303,9 +336,10 @@
 **Goal:** Safely deploy the Prisma-integrated application, monitor its stability and performance, and fully transition away from the old data access methods.
 
 1.  **Parallel Running / Feature Flagging (Optional but Recommended):**
-    *   [ ] **Implement Feature Flags:** Introduce flags (e.g., using environment variables or a feature flag service) to toggle between old (supabase-js) and new (Prisma) data access layers for specific services or endpoints.
-    *   [ ] **Compatibility Layer:** If necessary, create a temporary layer to abstract data access, allowing the flag to switch implementations underneath.
-    *   [ ] **Deploy Feature Flags:** Deploy the code with the ability to switch implementations. Start with Prisma disabled or enabled only for specific internal users/traffic percentage.
+    *   [X] **Implement Parallel Routes:** Set up separate API routes for Prisma implementation:
+        *   [X] `/api/prisma/carriers/*`
+        *   [X] `/api/prisma/procedures/*`
+        *   [X] `/api/prisma/guidelines/*`
     *   [ ] **Monitoring Setup:** Ensure monitoring (logs, metrics, error tracking) captures data for *both* implementations, tagged appropriately.
     *   [ ] **Performance Comparison:** Collect performance data (latency, throughput, error rates) for both implementations under real traffic (if possible) or realistic load tests.
     *   [ ] **Validation:** Compare results from both implementations to ensure consistency. Document and resolve any discrepancies.
@@ -344,7 +378,7 @@
 1.  **Vector Fields:** Handled during Schema Synchronization (Phase 2) - ensure `vector(1536)` type is correctly mapped or handled.
 2.  **Embedding Generation Service (`src/utils/embeddings.ts`, `EmbeddingManager.ts`):** Review if this service needs to interact with Prisma (e.g., fetching content to embed). If so, migrate its DB calls.
 3.  **Vector Search Implementation (`src/services/vector-index.service.ts`):**
-    *   [ ] Confirm how vector search queries are executed. Likely using `prisma.$queryRaw` or `prisma.$executeRaw` to call `pgvector` functions like `<=>`.
+    *   [X] **Implement Vector Search:** Done in PrismaGuidelineService using `prisma.$queryRaw` for semantic search.
     *   [ ] Ensure raw query results are correctly mapped to application types.
     *   [ ] Optimize raw vector queries if necessary.
 

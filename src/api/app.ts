@@ -1,18 +1,8 @@
-
-// Prisma API routes (for testing and comparison)
-app.use('/api/prisma/carriers', prismaCarrierRoutes);
-
-// Test Prisma connection on startup
-testConnection().then(connected => {
-  if (connected) {
-    console.log('✅ Prisma database connection successfully established');
-  } else {
-    console.error('❌ Prisma database connection failed');
-  }
-});import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
+import { handlePrismaErrors } from './middleware/prisma-error.js';
 import { validateApiKey } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { monitor } from './middleware/monitoring.js';
@@ -23,6 +13,8 @@ import carrierRoutes from './routes/carrier.routes.js';
 import procedureRoutes from './routes/procedure.routes.js';
 import guidelinesRoutes from './routes/guidelines.routes.js';
 import prismaCarrierRoutes from './routes/prisma/carrier.routes.js';
+import prismaProcedureRoutes from './routes/prisma/procedure.routes.js';
+import prismaGuidelinesRoutes from './routes/prisma/guidelines.routes.js';
 import { supabase } from '../utils/supabase.js';
 import { testConnection } from '../lib/prisma.js';
 
@@ -88,8 +80,23 @@ app.use('/api/carriers', carrierRoutes);
 app.use('/api/procedures', procedureRoutes);
 app.use('/api/guidelines', guidelinesRoutes);
 
+// Prisma API routes (for testing and comparison)
+app.use('/api/prisma/carriers', prismaCarrierRoutes);
+app.use('/api/prisma/procedures', prismaProcedureRoutes);
+app.use('/api/prisma/guidelines', prismaGuidelinesRoutes);
+
+// Test Prisma connection on startup
+testConnection().then(connected => {
+  if (connected) {
+    console.log('✅ Prisma database connection successfully established');
+  } else {
+    console.error('❌ Prisma database connection failed');
+  }
+});
+
 // Error handling
 app.use(notFoundHandler);
+app.use(handlePrismaErrors);
 app.use(errorHandler);
 
-export default app; 
+export default app;

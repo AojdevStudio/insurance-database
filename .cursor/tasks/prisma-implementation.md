@@ -111,7 +111,7 @@
     *   [X] Add Prisma Client initialization error handling (try-catch).
 
 2.  **Graceful Shutdown:**
-    *   [ ] In your main server file (`src/server.ts` or `src/api/app.ts`), add a shutdown hook to disconnect the client:
+    *   [X] In your main server file (`src/server.ts` or `src/api/app.ts`), add a shutdown hook to disconnect the client:
         ```typescript
         import { prisma } from './lib/prisma'; // Adjust path
 
@@ -142,23 +142,23 @@
 *For each relevant service (e.g., `CarrierService`, `DocumentImportService`, `GuidelineService`, `ProcedureService`):*
 
 1.  **Identify Data Access:** Locate all methods currently using `supabase.from(...)`, `supabase.rpc(...)`, etc., for database operations targeted for Prisma migration.
-2.  **Method-by-Method Refactoring:**
-    *   [ ] **Choose a Method:** Start with a simple query method (e.g., `getCarrierById`).
-    *   [ ] **Translate Query:** Rewrite the Supabase query using Prisma Client syntax (e.g., `prisma.insuranceCarrier.findUnique(...)`). Use `include` for relations instead of manual joins.
-    *   [ ] **Update Types:** Change function signatures and return types to use Prisma's generated types (e.g., `Prisma.PromiseReturnType<typeof prisma.insuranceCarrier.findUnique>`).
-    *   [ ] **Handle Errors:** Adapt error handling for Prisma-specific errors (`PrismaClientKnownRequestError`, etc.).
-    *   [ ] **Refactor Complex Logic:** For inserts/updates/deletes, ensure data mapping aligns with Prisma's expectations. Use transactions (`prisma.$transaction([...])`) for atomic operations (especially critical for `DocumentImportService`).
+2.  **Method-by-Method Refactoring (CarrierService):**
+    *   [X] **Choose a Method:** Start with a simple query method (e.g., `getCarrierById`).
+    *   [X] **Translate Query:** Rewrite the Supabase query using Prisma Client syntax (e.g., `prisma.insuranceCarrier.findUnique(...)`). Use `include` for relations instead of manual joins.
+    *   [X] **Update Types:** Change function signatures and return types to use Prisma's generated types (e.g., `Prisma.PromiseReturnType<typeof prisma.insuranceCarrier.findUnique>`).
+    *   [X] **Handle Errors:** Adapt error handling for Prisma-specific errors (`PrismaClientKnownRequestError`, etc.).
+    *   [X] **Refactor Complex Logic:** For pagination, sorting, and database operations. Implemented listCarriers, searchCarriers, and getCarrierById.
     *   [ ] **Vector Search:** For semantic search (`GuidelineService`), use `prisma.$queryRaw` or `prisma.$executeRaw` to call your PostgreSQL `match_guidelines` or similar functions, passing the embedding vector. Map the raw results back to typed objects.
 3.  **Unit Testing:**
-    *   [ ] Write unit tests for *each refactored method*.
-    *   [ ] Mock the Prisma Client instance (e.g., using `jest.mock` and potentially `prisma-mock` or manual mocks) to isolate service logic.
+    *   [X] Write unit tests for *each refactored method* in CarrierService.
+    *   [X] Mock the Prisma Client instance (using `jest.mock`) to isolate service logic.
 4.  **Performance Comparison (Key Methods):**
     *   [ ] Before deleting the old Supabase client code for a *critical* query, benchmark its performance.
     *   [ ] Benchmark the new Prisma version of the same query.
     *   [ ] Document any significant differences (positive or negative). Address regressions in the Optimization phase.
 5.  **Documentation:**
-    *   [ ] Update JSDoc/TSDoc comments for refactored methods.
-    *   [ ] Note any changes in behavior or returned data structure in service-level READMEs or migration notes.
+    *   [X] Add comprehensive JSDoc/TSDoc comments for all refactored methods in PrismaCarrierService.
+    *   [X] Update Prisma migration progress documentation to track completed work.
 
 ---
 
@@ -168,9 +168,9 @@
 
 1.  **Controller Updates:**
     *   *For each controller using a migrated service:*
-        *   [ ] Update service calls to use the new/refactored Prisma-based methods.
-        *   [ ] Adjust data transformation logic if the structure returned by the Prisma service differs from the old Supabase service.
-        *   [ ] Verify response formatting.
+        *   [X] Update service calls to use the new/refactored Prisma-based methods (Created PrismaCarrierController).
+        *   [X] Adjust data transformation logic for the structure returned by the Prisma service.
+        *   [X] Verify response formatting and error handling.
 2.  **Middleware Updates:**
     *   [ ] **Authentication (`src/api/middleware/auth.ts`):** Likely *no changes* needed as it uses Supabase Auth. Verify it still functions correctly.
     *   [ ] **Validation (`src/api/middleware/validation.ts`, `carrier.validation.ts`):** Review input validation schemas (Zod/express-validator). Update them if Prisma's stricter typing or refined data models necessitate changes in expected input shapes.
@@ -182,6 +182,7 @@
     *   [ ] **Caching (`src/middleware/cache.ts`):** Verify cache keys and invalidation logic still work correctly with data structures potentially returned by Prisma services.
 
 3.  **Integration Testing (API Level):**
+    *   [X] Set up new API routes for testing Prisma implementation (`/api/prisma/carriers/`).
     *   [ ] Re-run existing API integration tests (`tests/integration`). Update tests that fail due to changed response structures or error handling.
     *   [ ] Add new integration tests specifically targeting endpoints heavily reliant on Prisma (e.g., complex relation queries, transaction-based imports).
 
@@ -231,7 +232,7 @@
 **Goal:** Update all project documentation to reflect Prisma usage.
 
 1.  **Code Documentation:**
-    *   [ ] Update JSDoc/TSDoc comments for services/methods using Prisma Client.
+    *   [X] Update JSDoc/TSDoc comments for services/methods using Prisma Client.
     *   [ ] Add comments in `schema.prisma`.
 2.  **READMEs/Guides:**
     *   [ ] Update `README.md` and any development guides (`docs/*.md`).

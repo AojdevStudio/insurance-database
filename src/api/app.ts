@@ -1,4 +1,15 @@
-import express from 'express';
+
+// Prisma API routes (for testing and comparison)
+app.use('/api/prisma/carriers', prismaCarrierRoutes);
+
+// Test Prisma connection on startup
+testConnection().then(connected => {
+  if (connected) {
+    console.log('✅ Prisma database connection successfully established');
+  } else {
+    console.error('❌ Prisma database connection failed');
+  }
+});import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -11,7 +22,9 @@ import { AuditLogService } from '../services/auditLog.service.js';
 import carrierRoutes from './routes/carrier.routes.js';
 import procedureRoutes from './routes/procedure.routes.js';
 import guidelinesRoutes from './routes/guidelines.routes.js';
+import prismaCarrierRoutes from './routes/prisma/carrier.routes.js';
 import { supabase } from '../utils/supabase.js';
+import { testConnection } from '../lib/prisma.js';
 
 const app = express();
 

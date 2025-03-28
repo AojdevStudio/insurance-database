@@ -55,4 +55,21 @@ This document tracks the progress of implementing Prisma ORM in the Insurance Da
 - Phase 12: RAG Integration Updates
 
 ## Current Status
-As of March 27, 2025, we have successfully completed Phases 1-3 of the implementation plan. The database connection is working, the schema has been properly modeled, and basic integration tests are passing. We are now ready to begin migrating the service layer from Supabase to Prisma.
+As of March 27, 2025, we have successfully completed Phases 1-3 and begun Phase 4 of the implementation plan:
+
+1. Phases 1-3: ✅ Complete
+   - Database connection, schema modeling, and integration testing all working.
+
+2. Phase 4: 🔄 In Progress
+   - Created Prisma-based implementation of CarrierService with three methods:
+     - `listCarriers`: Returns paginated list with sorting
+     - `searchCarriers`: Searches carriers by name with pagination and sorting
+     - `getCarrierById`: Retrieves a single carrier by ID
+   - Implemented proper Prisma error handling for various scenarios
+   - Created unit tests with mocked Prisma client
+
+Next steps will be:
+1. Create a controller adapter to use the new Prisma-based service
+2. Test the implementation with the real database
+3. Benchmark performance against the Supabase implementation
+4. Move on to the next service (DocumentImportService)

@@ -64,8 +64,8 @@
 **Goal:** Generate the initial Prisma schema from the existing Supabase database and refine it for optimal Prisma usage while respecting the SQL source of truth.
 
 1.  **Database Introspection (Source of Truth: SQL Migrations):**
-    *   [ ] **Run `npx prisma db pull`**. This synchronizes `prisma/schema.prisma` with the current state defined by your `supabase/migrations/*.sql` files applied to the DB.
-    *   [ ] **Initial Review:** Compare the generated `schema.prisma` against your SQL files. Verify tables, columns, and basic types are present.
+    *   [X] **Run `npx prisma db pull`**. This synchronizes `prisma/schema.prisma` with the current state defined by your `supabase/migrations/*.sql` files applied to the DB.
+    *   [X] **Initial Review:** Compare the generated `schema.prisma` against your SQL files. Verify tables, columns, and basic types are present.
 
 2.  **Schema Refinement (Manual Adjustments in `schema.prisma`):**
     *   [ ] **Map Names:** Add `@@map("table_name")` to models and `@map("column_name")` to fields to align Prisma's idiomatic naming (camelCase) with your database's likely snake_case naming. *Crucial step*.
@@ -89,7 +89,7 @@
     *   [ ] **Verify Types:** Briefly inspect `node_modules/.prisma/client/index.d.ts` to ensure generated types look correct (e.g., model names, field names, relations).
 
 4.  **Document Schema Workflow:**
-    *   [ ] Add a section to `docs/development-guide.md` (or similar) clearly stating:
+    *   [X] Add a section to `docs/development/prisma-schema-workflow.md` clearly stating:
         *   SQL migrations (`supabase/migrations`) are the source of truth.
         *   **Workflow for Schema Changes:**
             1.  Modify/Create `.sql` migration file.
@@ -97,6 +97,8 @@
             3.  Synchronize Prisma Schema: `npm run prisma:pull`.
             4.  Review changes in `schema.prisma` (add/adjust mappings/relations if needed).
             5.  Regenerate Prisma Client: `npm run prisma:generate`.
+    *   [X] Update README.md with a link to the schema workflow documentation.
+    *   [X] Document the Prisma implementation in CHANGELOG.md.
 
 ---
 

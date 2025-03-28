@@ -1,4 +1,19 @@
-# Changelog
+
+## [1.1.0] - Ongoing Development (March 2025)
+
+### Added
+- Prisma ORM integration for database access:
+  - Enhanced type safety for database operations
+  - Improved relation handling
+  - Better database error handling
+- New endpoints at `/api/prisma/*` for testing Prisma implementation
+- Comprehensive documentation for Prisma schema workflow
+- Migration of CarrierService to use Prisma instead of direct Supabase queries
+
+### Changed
+- Refactored database access layer to use Prisma Client
+- Updated schema handling to use SQL migrations as source of truth
+- Enhanced error handling for database operations# Changelog
 
 All notable changes to the Insurance Database API will be documented in this file.
 

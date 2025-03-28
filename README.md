@@ -1,4 +1,13 @@
-# Insurance Database Project
+
+## Schema Management
+
+This project uses a SQL-first approach to schema management:
+
+1. SQL migrations (in `supabase/migrations/`) are the source of truth for schema changes
+2. Prisma schema is generated from the database using `prisma db pull`
+3. After schema changes, run `npm run db:pull-generate` to update the Prisma client
+
+For detailed workflow information, see [Prisma Schema Workflow](docs/development/prisma-schema-workflow.md).# Insurance Database Project
 
 A comprehensive database system for dental insurance information with a focus on modeling network-carrier-plan hierarchies.
 

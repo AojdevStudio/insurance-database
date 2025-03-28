@@ -54,7 +54,7 @@
         ```
 
 6.  **Initial Connection Test:**
-    *   [ ] Run `npx prisma db pull` to perform the first introspection and verify the database connection. Address any connection errors.
+    *   [X] Run `npx prisma db pull` to perform the first introspection and verify the database connection. Address any connection errors.
     *   [X] Run `npx prisma format` to ensure initial schema formatting.
 
 ---

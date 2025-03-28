@@ -10,7 +10,7 @@ declare global {
 }
 
 // Configuration for PrismaClient
-const prismaClientOptions = {
+const prismaClientOptions: { log: any[] } = {
   // Configure logging based on environment
   log: process.env.NODE_ENV === 'development' 
     ? ['query', 'info', 'warn', 'error'] 

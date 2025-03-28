@@ -1,3 +1,4 @@
+import { disconnectPrisma } from './lib/prisma.js';
 import app from './api/app.js';
 import dotenv from 'dotenv';
 

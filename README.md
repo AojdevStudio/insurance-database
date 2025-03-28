@@ -44,7 +44,7 @@ The project uses Prisma ORM to interact with the database. The connection is con
 
 ### Local Development
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:54321/postgres?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres?schema=public"
 ```
 
 ### Production (Supabase)

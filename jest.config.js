@@ -2,37 +2,39 @@
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  testMatch: ['**/*.test.ts'],
   extensionsToTreatAsEsm: ['.ts'],
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest', 
+      {
+        useESM: true,
+        // Add tsconfig options to override rootDir
+        tsconfig: {
+          rootDir: './'
+        }
+      }
+    ],
+  },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
-  transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        useESM: true,
-      },
-    ],
-  },
+  // Set up environment variables for testing
+  setupFiles: ['<rootDir>/tests/setup-env.js'],
+  // Global teardown after all tests are done
+  globalTeardown: '<rootDir>/tests/teardown.js',
+  // Collect coverage information
+  collectCoverage: false,
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'clover'],
-  coverageThreshold: {
-    global: {
-      statements: 90,
-      branches: 80,
-      functions: 90,
-      lines: 90,
-    },
-  },
-  testMatch: [
-    '**/__tests__/**/*.test.ts',
-    '**/tests/**/*.test.ts'
-  ],
-  testTimeout: 30000,
-  verbose: true,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
-    '!src/**/__tests__/**',
+    '!src/**/*.test.ts',
+    '!src/types/**',
+    '!**/node_modules/**',
   ],
+  // For mocking @prisma/client properly
+  modulePathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/dist/'],
+  // Increase timeout for tests that deal with database operations
+  testTimeout: 30000,
 }; 

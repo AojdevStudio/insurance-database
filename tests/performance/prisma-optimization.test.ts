@@ -8,6 +8,7 @@ import { prisma as optimizedPrisma } from '../../src/lib/prisma-optimized.js';
 import { redis } from '../../src/lib/redis-optimized.js';
 import { PrismaOptimizationService } from '../../src/api/services/prisma/optimization.service.js';
 import { logger } from '../../src/api/utils/logger.js';
+import { PrismaClient } from '@prisma/client';
 
 // Only run in development environment
 const isCI = process.env.CI === 'true';
@@ -25,18 +26,18 @@ const carrierListQuery = () => prisma.insuranceCarrier.findMany({
 const optimizedCarrierListQuery = () => optimizedPrisma.insuranceCarrier.findMany({
   select: {
     id: true,
-    carrierName: true,
-    carrierType: true,
-    payerId: true,
-    createdAt: true
+    name: true,
+    carrier_type: true,
+    payer_id: true,
+    created_at: true
   },
   take: 10,
-  orderBy: { createdAt: 'desc' }
+  orderBy: { created_at: 'desc' }
 });
 
 const carrierSearchQuery = (term: string) => prisma.insuranceCarrier.findMany({
   where: {
-    carrierName: { contains: term, mode: 'insensitive' }
+    name: { contains: term, mode: 'insensitive' }
   },
   take: 10
 });
@@ -44,16 +45,49 @@ const carrierSearchQuery = (term: string) => prisma.insuranceCarrier.findMany({
 const optimizedCarrierSearchQuery = (term: string) => optimizedPrisma.insuranceCarrier.findMany({
   select: {
     id: true,
-    carrierName: true,
-    carrierType: true,
-    payerId: true,
-    createdAt: true
+    name: true,
+    carrier_type: true,
+    payer_id: true,
+    created_at: true
   },
   where: {
-    carrierName: { contains: term, mode: 'insensitive' }
+    name: { contains: term, mode: 'insensitive' }
   },
   take: 10
 });
+
+// Basic query
+const basicQuery = async (prisma: PrismaClient, term: string) => {
+  const carriers = await prisma.insuranceCarrier.findMany({
+    where: {
+      name: { contains: term, mode: 'insensitive' }
+    },
+    select: {
+      id: true,
+      name: true,
+      created_at: true 
+    },
+    take: 50,
+    orderBy: { created_at: 'desc' }
+  });
+  return carriers;
+};
+
+// Optimized query with projection
+const optimizedQuery = async (prisma: PrismaClient, term: string) => {
+  const carriers = await prisma.insuranceCarrier.findMany({
+    where: {
+      name: { contains: term, mode: 'insensitive' }
+    },
+    select: {
+      id: true,
+      name: true,
+      created_at: true
+    },
+    take: 50,
+  });
+  return carriers;
+};
 
 describe('Prisma Optimization Tests', () => {
   (isCI ? describe.skip : describe)('Performance Benchmarks', () => {
@@ -165,8 +199,8 @@ describe('Prisma Optimization Tests', () => {
       const selectiveQuery = () => optimizedPrisma.insuranceCarrier.findMany({
         select: {
           id: true,
-          carrierName: true,
-          carrierType: true,
+          name: true,
+          carrier_type: true,
         },
         take: 20
       });

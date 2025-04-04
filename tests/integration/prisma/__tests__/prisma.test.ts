@@ -100,7 +100,7 @@ describe('Prisma Client Integration Tests', () => {
       const networksWithCarriers = await prisma.insuranceNetwork.findMany({
         take: 5, // Limit results
         include: {
-          carrierRelationships: {
+          networkCarrierRelationships: {
             include: {
               carrier: true
             }
@@ -110,8 +110,8 @@ describe('Prisma Client Integration Tests', () => {
       
       expect(Array.isArray(networksWithCarriers)).toBe(true);
       networksWithCarriers.forEach(network => {
-        expect(network).toHaveProperty('carrierRelationships');
-        expect(Array.isArray(network.carrierRelationships)).toBe(true);
+        expect(network).toHaveProperty('networkCarrierRelationships');
+        expect(Array.isArray(network.networkCarrierRelationships)).toBe(true);
       });
     });
   });

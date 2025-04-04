@@ -1,239 +1,466 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+/// Prisma schema for Insurance Database project
+/// This schema models the network-carrier-plan hierarchy for dental insurance
+/// with support for procedures, documentation requirements, and vector search
+
+// The generator block configures the Prisma Client generation
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Enable advanced features for performance optimization
+  previewFeatures = ["fullTextSearch", "jsonFilter"]
 }
 
+// The datasource block configures the database connection
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-/// Insurance carrier information
-model InsuranceCarrier {
-  id                        BigInt                      @id @default(autoincrement())
-  name                      String
-  created_at                DateTime?                   @default(now()) @db.Timestamptz(6)
-  updated_at                DateTime?                   @default(now()) @db.Timestamptz(6)
+/// Insurance networks and their contact information
+/// Networks are the highest level in the hierarchy (e.g., DNOA - Dental Network of America)
+model InsuranceNetwork {
+  id           BigInt     @id @default(autoincrement())
+  /// The official name of the insurance network
+  networkName  String     @map("network_name")
+  /// Phone number for network inquiries
+  contactPhone String?    @map("contact_phone")
+  /// Email address for network inquiries
+  contactEmail String?    @map("contact_email")
+  /// URL to network resources or documentation
+  resourceUrl  String?    @map("resource_url")
+  /// Additional textual information about the network
+  notes        String?
+  /// When the network was first added to the system
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the network information was last updated
+  updatedAt    DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
   
-  documents                 CarrierDocument[]
-  aliases                   CarrierAlias[]
-  procedureRequirements     CarrierProcedureRequirement[]
+  // Relations
+  /// Insurance carriers that belong to this network
+  carrierRelationships NetworkCarrierRelationship[]
+  /// Credentialing requirements specific to this network
   credentialingRequirements CredentialingRequirement[]
-  plans                     InsurancePlan[]
-  medicareAdvantagePlans    MedicareAdvantagePlan[]
-  networkRelationships      NetworkCarrierRelationship[]
-  processingCaveats         ProcessingCaveat[]
+  /// Processing caveats specific to this network
+  processingCaveats ProcessingCaveat[]
+
+  /// Maps this Prisma model to the actual database table name
+  @@map("insurance_networks")
+  /// Index on network name for faster lookups
+  @@index([networkName], name: "idx_network_name")
+}
+
+/// Insurance carriers and their basic information
+/// Carriers are companies that provide insurance plans (e.g., BCBS, Delta Dental)
+model InsuranceCarrier {
+  id           BigInt     @id @default(autoincrement())
+  /// The official name of the insurance carrier
+  carrierName  String     @map("carrier_name")
+  /// Type of carrier (e.g., "National", "Medicare Advantage", "TPA", "Other")
+  carrierType  String?    @map("carrier_type")
+  /// Payer ID used for claim submissions
+  payerId      String?    @map("payer_id")
+  /// Address for submitting claims
+  claimsAddress String?   @map("claims_address")
+  /// Customer service phone number
+  phoneNumber  String?    @map("phone_number")
+  /// When the carrier was first added to the system
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the carrier information was last updated
+  updatedAt    DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// Network relationships this carrier participates in
+  networkRelationships NetworkCarrierRelationship[]
+  /// Medicare Advantage plans offered by this carrier
+  medicareAdvantagePlans MedicareAdvantagePlan[]
+  /// Credentialing requirements specific to this carrier
+  credentialingRequirements CredentialingRequirement[]
+  /// Processing caveats specific to this carrier
+  processingCaveats ProcessingCaveat[]
+  /// Alternative names for this carrier
+  aliases CarrierAlias[]
+  /// Insurance plans offered by this carrier
+  plans InsurancePlan[]
+  /// Procedure requirements specific to this carrier
+  procedureRequirements CarrierProcedureRequirement[]
+  /// Documents related to this carrier
+  documents CarrierDocument[]
 
   @@map("insurance_carriers")
+  @@index([carrierName], name: "idx_carrier_name")
+  @@index([payerId], name: "idx_payer_id")
 }
 
-/// Insurance network information (umbrella organizations)
-model InsuranceNetwork {
-  id                         BigInt                       @id @default(autoincrement())
-  network_name               String                       @map("network_name")
-  contact_phone              String?                      @map("contact_phone")
-  contact_email              String?                      @map("contact_email")
-  resource_url               String?                      @map("resource_url")
-  notes                      String?
-  created_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+/// Mapping table that connects insurance networks with carriers
+/// Represents the relationship between a network and its member carriers
+model NetworkCarrierRelationship {
+  id              BigInt       @id @default(autoincrement())
+  /// Reference to the parent network
+  networkId       BigInt       @map("network_id")
+  /// Reference to the member carrier
+  carrierId       BigInt       @map("carrier_id")
+  /// When the carrier joined the network
+  effectiveDate   DateTime?    @map("effective_date") @db.Date
+  /// When the carrier left/will leave the network (null if still active)
+  terminationDate DateTime?    @map("termination_date") @db.Date
+  /// Additional notes specific to this network-carrier relationship
+  specialNotes    String?      @map("special_notes")
+  /// Whether verification is required for this carrier's network participation
+  verificationRequired Boolean  @default(false) @map("verification_required")
+  /// When the relationship was first recorded
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the relationship information was last updated
+  updatedAt       DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
   
-  credentialingRequirements  CredentialingRequirement[]
-  carrierRelationships       NetworkCarrierRelationship[]
-  processingCaveats          ProcessingCaveat[]
+  // Relations
+  /// The parent network in this relationship
+  network         InsuranceNetwork @relation(fields: [networkId], references: [id])
+  /// The member carrier in this relationship
+  carrier         InsuranceCarrier @relation(fields: [carrierId], references: [id])
 
-  @@map("insurance_networks")
+  /// Ensures a carrier can only be related to a network once
+  @@unique([networkId, carrierId])
+  @@map("network_carrier_relationships")
+  @@index([networkId], name: "idx_network_rel_network_id")
+  @@index([carrierId], name: "idx_network_rel_carrier_id")
 }
 
-/// Dental procedure codes and descriptions
-model Procedure {
-  id                      BigInt                        @id @default(autoincrement())
-  procedure_code          String                        @unique @map("procedure_code")
-  description             String
-  category                String?
-  created_at              DateTime?                     @default(now()) @db.Timestamptz(6)
-  updated_at              DateTime?                     @default(now()) @db.Timestamptz(6)
-  
-  carrierRequirements     CarrierProcedureRequirement[]
-
-  @@map("procedures")
-}
-
-/// This model contains carrier name aliases for fuzzy matching
-model CarrierAlias {
-  id         BigInt           @id @default(autoincrement())
-  carrier_id BigInt?
-  alias_name String           @unique @map("alias_name")
-  created_at DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at DateTime?        @default(now()) @db.Timestamptz(6)
-  
-  carrier    InsuranceCarrier? @relation(fields: [carrier_id], references: [id])
-
-  @@map("carrier_aliases")
-}
-
-/// Documentation uploaded for specific insurance carriers
-model CarrierDocument {
-  id                BigInt                @id @default(autoincrement())
-  carrier_id        BigInt?
-  filename          String
-  metadata          Json?                 @default("{}")
-  total_pages       Int?                  @default(0)
-  processed_date    DateTime?             @default(now()) @db.Timestamptz(6)
-  created_at        DateTime?             @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime?             @default(now()) @db.Timestamptz(6)
-  
-  carrier           InsuranceCarrier?     @relation(fields: [carrier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  pages             DocumentPage[]
-  procedures        DocumentProcedure[]
-
-  @@map("carrier_documents")
-}
-
-/// Individual pages from carrier documents with extracted content
-model DocumentPage {
-  id            BigInt           @id @default(autoincrement())
-  document_id   BigInt?
-  page_number   Int
-  content       String
-  created_at    DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime?        @default(now()) @db.Timestamptz(6)
-  
-  document      CarrierDocument? @relation(fields: [document_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@unique([document_id, page_number])
-  @@map("document_pages")
-}
-
-/// Procedures mentioned in carrier documents
-model DocumentProcedure {
-  id                      BigInt           @id @default(autoincrement())
-  document_id             BigInt?
-  procedure_code          String
-  description             String?
-  submission_requirements String?
-  documentation_required  Boolean?         @default(false)
-  created_at              DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at              DateTime?        @default(now()) @db.Timestamptz(6)
-  
-  document                CarrierDocument? @relation(fields: [document_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@unique([document_id, procedure_code])
-  @@map("document_procedures")
-}
-
-/// Requirements for specific procedures by carrier
-model CarrierProcedureRequirement {
-  id                     BigInt           @id @default(autoincrement())
-  carrier_id             BigInt?
-  procedure_id           BigInt?
-  documentation_required String?
-  frequency_limitation   String?
-  age_restrictions       String?
-  other_limitations      String?
-  created_at             DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime?        @default(now()) @db.Timestamptz(6)
-  
-  carrier                InsuranceCarrier? @relation(fields: [carrier_id], references: [id])
-  procedure              Procedure?       @relation(fields: [procedure_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@unique([carrier_id, procedure_id])
-  @@map("carrier_procedure_requirements")
-}
-
-/// Credentialing requirements for networks and carriers
-model CredentialingRequirement {
-  id                   BigInt              @id @default(autoincrement())
-  network_id           BigInt?
-  carrier_id           BigInt?
-  requirement_type     String?
-  description          String
-  documentation_needed String?
-  timeframe            String?
-  created_at           DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime?           @default(now()) @db.Timestamptz(6)
-  
-  network              InsuranceNetwork?   @relation(fields: [network_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  carrier              InsuranceCarrier?   @relation(fields: [carrier_id], references: [id])
-
-  @@map("credentialing_requirements")
-}
-
-/// Insurance plan information
-model InsurancePlan {
-  id                    BigInt           @id @default(autoincrement())
-  carrier_id            BigInt?
-  plan_name             String           @map("plan_name")
-  plan_type             String?          @map("plan_type")
-  is_medicare_advantage Boolean?         @default(false) @map("is_medicare_advantage")
-  notes                 String?
-  created_at            DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime?        @default(now()) @db.Timestamptz(6)
-  
-  carrier               InsuranceCarrier? @relation(fields: [carrier_id], references: [id])
-
-  @@map("insurance_plans")
-}
-
-/// Medicare Advantage plan information
+/// Medicare Advantage plans offered by carriers
+/// Medicare Advantage plans have specific requirements and coverage areas
 model MedicareAdvantagePlan {
-  id             BigInt           @id @default(autoincrement())
-  carrier_id     BigInt?
-  plan_name      String           @map("plan_name")
-  states_covered String?          @map("states_covered")
-  effective_date DateTime?        @db.Date @map("effective_date")
-  notes          String?
-  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  id            BigInt      @id @default(autoincrement())
+  /// Reference to the carrier offering this plan
+  carrierId     BigInt      @map("carrier_id")
+  /// Name of the Medicare Advantage plan
+  planName      String      @map("plan_name")
+  /// Comma-separated list of state abbreviations where this plan is available
+  statesCovered String?     @map("states_covered")
+  /// When this plan became effective
+  effectiveDate DateTime?   @map("effective_date") @db.Date
+  /// Additional information about the plan
+  notes         String?
+  /// When the plan was first added to the system
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the plan information was last updated
+  updatedAt     DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
   
-  carrier        InsuranceCarrier? @relation(fields: [carrier_id], references: [id])
+  // Relations
+  /// The carrier offering this Medicare Advantage plan
+  carrier       InsuranceCarrier @relation(fields: [carrierId], references: [id])
 
   @@map("medicare_advantage_plans")
+  @@index([carrierId], name: "idx_medicare_carrier_id")
+  @@index([planName], name: "idx_medicare_plan_name")
 }
 
-/// Relationships between networks and carriers
-model NetworkCarrierRelationship {
-  id                    BigInt              @id @default(autoincrement())
-  network_id            BigInt?
-  carrier_id            BigInt?
-  effective_date        DateTime?           @db.Date @map("effective_date")
-  termination_date      DateTime?           @db.Date @map("termination_date")
-  special_notes         String?             @map("special_notes")
-  verification_required Boolean?            @default(false) @map("verification_required")
-  created_at            DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime?           @default(now()) @db.Timestamptz(6)
+/// Documentation and timeline requirements for credentialing
+/// Requirements for providers to be credentialed with networks or carriers
+model CredentialingRequirement {
+  id              BigInt         @id @default(autoincrement())
+  /// Optional reference to the network this requirement applies to
+  networkId       BigInt?        @map("network_id")
+  /// Optional reference to the carrier this requirement applies to
+  carrierId       BigInt?        @map("carrier_id")
+  /// Category of requirement (e.g., "License", "Insurance", "Education")
+  requirementType String?        @map("requirement_type")
+  /// Detailed description of the requirement
+  description     String
+  /// Documentation needed to satisfy this requirement
+  documentationNeeded String?    @map("documentation_needed")
+  /// Expected time frame for processing
+  timeframe       String?
+  /// When the requirement was first added to the system
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the requirement information was last updated
+  updatedAt       DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
   
-  network               InsuranceNetwork?   @relation(fields: [network_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  carrier               InsuranceCarrier?   @relation(fields: [carrier_id], references: [id])
+  // Relations
+  /// The network this requirement is specific to (if applicable)
+  network         InsuranceNetwork? @relation(fields: [networkId], references: [id])
+  /// The carrier this requirement is specific to (if applicable)
+  carrier         InsuranceCarrier? @relation(fields: [carrierId], references: [id])
 
-  @@unique([network_id, carrier_id])
-  @@map("network_carrier_relationships")
+  @@map("credentialing_requirements")
+  @@index([networkId], name: "idx_cred_req_network_id")
+  @@index([carrierId], name: "idx_cred_req_carrier_id")
 }
 
-/// Record of uploaded JSON files
-model JsonUpload {
-  id          BigInt    @id @default(autoincrement())
-  file_name   String    @map("file_name")
-  content     Json
-  uploaded_at DateTime? @default(now()) @db.Timestamptz(6) @map("uploaded_at")
-
-  @@index([file_name], map: "idx_json_uploads_file_name")
-  @@map("json_uploads")
-}
-
-/// Special processing notes and issues for networks/carriers
+/// Special processing rules and exceptions
+/// Caveats for claims processing specific to networks or carriers
 model ProcessingCaveat {
-  id                 BigInt              @id @default(autoincrement())
-  network_id         BigInt?
-  carrier_id         BigInt?
-  caveat_type        String?             @map("caveat_type")
-  description        String
-  impact_level       String?             @map("impact_level")
-  workaround         String?
-  created_at         DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  id           BigInt      @id @default(autoincrement())
+  /// Optional reference to the network this caveat applies to
+  networkId    BigInt?     @map("network_id")
+  /// Optional reference to the carrier this caveat applies to
+  carrierId    BigInt?     @map("carrier_id")
+  /// Type of caveat (e.g., "Claims", "Preauthorization", "Coverage")
+  caveatType   String?     @map("caveat_type")
+  /// Detailed description of the processing caveat
+  description  String
+  /// Severity of impact (e.g., "Low", "Medium", "High", "Critical")
+  impactLevel  String?     @map("impact_level")
+  /// Suggested workaround for the caveat
+  workaround   String?
+  /// When the caveat was first added to the system
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the caveat information was last updated
+  updatedAt    DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
   
-  network            InsuranceNetwork?   @relation(fields: [network_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  carrier            InsuranceCarrier?   @relation(fields: [carrier_id], references: [id])
+  // Relations
+  /// The network this caveat is specific to (if applicable)
+  network      InsuranceNetwork? @relation(fields: [networkId], references: [id])
+  /// The carrier this caveat is specific to (if applicable)
+  carrier      InsuranceCarrier? @relation(fields: [carrierId], references: [id])
 
   @@map("processing_caveats")
+  @@index([networkId], name: "idx_caveat_network_id")
+  @@index([carrierId], name: "idx_caveat_carrier_id")
+}
+
+/// Alternative names for insurance carriers
+/// Used for matching and normalization of carrier names
+model CarrierAlias {
+  id          BigInt    @id @default(autoincrement())
+  /// Reference to the canonical carrier
+  carrierId   BigInt    @map("carrier_id")
+  /// Alternative name or variation of the carrier's name
+  aliasName   String    @unique @map("alias_name")
+  /// When the alias was first added to the system
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the alias information was last updated
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The canonical carrier this alias refers to
+  carrier     InsuranceCarrier @relation(fields: [carrierId], references: [id])
+
+  @@map("carrier_aliases")
+  @@index([carrierId], name: "idx_alias_carrier_id")
+  @@index([aliasName], name: "idx_alias_name")
+}
+
+/// Specific insurance plans offered by carriers
+/// Plans are specific insurance products offered to members
+model InsurancePlan {
+  id                   BigInt    @id @default(autoincrement())
+  /// Reference to the carrier offering this plan
+  carrierId            BigInt    @map("carrier_id")
+  /// Name of the insurance plan
+  planName             String    @map("plan_name")
+  /// Type of plan (e.g., "PPO", "HMO", "EPO")
+  planType             String?   @map("plan_type")
+  /// Whether this plan is a Medicare Advantage plan
+  isMedicareAdvantage  Boolean   @default(false) @map("is_medicare_advantage")
+  /// Additional information about the plan
+  notes                String?
+  /// When the plan was first added to the system
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the plan information was last updated
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The carrier offering this insurance plan
+  carrier              InsuranceCarrier @relation(fields: [carrierId], references: [id])
+
+  @@map("insurance_plans")
+  @@index([carrierId], name: "idx_plan_carrier_id")
+  @@index([planName], name: "idx_plan_name")
+}
+
+/// Dental procedures and their categorization
+/// Procedures include CPT codes and dental service classifications
+model Procedure {
+  id              BigInt    @id @default(autoincrement())
+  /// Unique procedure code (typically CPT or ADA code)
+  procedureCode   String    @unique @map("procedure_code")
+  /// Human-readable description of the procedure
+  description     String
+  /// Category or classification of the procedure
+  category        String?
+  /// When the procedure was first added to the system
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the procedure information was last updated
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// Carrier-specific requirements for this procedure
+  carrierRequirements CarrierProcedureRequirement[]
+
+  @@map("procedures")
+  @@index([procedureCode], name: "idx_procedure_code")
+  @@index([category], name: "idx_procedure_category")
+}
+
+/// Specific requirements for procedures by carrier
+/// Holds carrier-specific requirements for dental procedures
+model CarrierProcedureRequirement {
+  id                  BigInt    @id @default(autoincrement())
+  /// Reference to the carrier with these requirements
+  carrierId           BigInt    @map("carrier_id")
+  /// Reference to the procedure these requirements apply to
+  procedureId         BigInt    @map("procedure_id")
+  /// Documentation required for this procedure
+  documentationRequired String? @map("documentation_required")
+  /// Frequency limitations for this procedure
+  frequencyLimitation String?   @map("frequency_limitation")
+  /// Age restrictions for this procedure
+  ageRestrictions     String?   @map("age_restrictions")
+  /// Other limitations or notes for this procedure
+  otherLimitations    String?   @map("other_limitations")
+  /// When the requirement was first added to the system
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the requirement information was last updated
+  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The carrier imposing these requirements
+  carrier             InsuranceCarrier @relation(fields: [carrierId], references: [id])
+  /// The procedure these requirements apply to
+  procedure           Procedure @relation(fields: [procedureId], references: [id])
+
+  @@unique([carrierId, procedureId])
+  @@map("carrier_procedure_requirements")
+  @@index([carrierId], name: "idx_req_carrier_id")
+  @@index([procedureId], name: "idx_req_procedure_id")
+}
+
+/// Documents from insurance carriers containing policy information
+/// Source documents for extracting guidelines and procedure information
+model CarrierDocument {
+  id              BigInt    @id @default(autoincrement())
+  /// Optional reference to the carrier this document belongs to
+  carrierId       BigInt?   @map("carrier_id")
+  /// Original filename of the document
+  filename        String
+  /// Additional metadata about the document (JSON)
+  metadata        Json?     @db.JsonB
+  /// Total number of pages in the document
+  totalPages      Int       @map("total_pages")
+  /// When the document was processed
+  processedDate   DateTime  @default(now()) @map("processed_date") @db.Timestamptz(6)
+  /// When the document was first added to the system
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the document information was last updated
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The carrier this document belongs to (if applicable)
+  carrier         InsuranceCarrier? @relation(fields: [carrierId], references: [id])
+  /// Individual pages of this document
+  pages           DocumentPage[]
+  /// Procedures extracted from this document
+  procedures      DocumentProcedure[]
+  /// Guidelines extracted from this document
+  guidelines      Guideline[]
+
+  @@map("carrier_documents")
+  @@index([carrierId], name: "idx_document_carrier_id")
+  @@index([filename], name: "idx_document_filename")
+}
+
+/// Individual pages of carrier documents with extracted text content
+/// Stores the text content of each page for searchability
+model DocumentPage {
+  id           BigInt    @id @default(autoincrement())
+  /// Reference to the parent document
+  documentId   BigInt    @map("document_id")
+  /// Page number within the document (1-based)
+  pageNumber   Int       @map("page_number")
+  /// Extracted text content of the page
+  content      String
+  /// When the page was first added to the system
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the page information was last updated
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The parent document this page belongs to
+  document     CarrierDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, pageNumber])
+  @@map("document_pages")
+  @@index([documentId], name: "idx_page_document_id")
+}
+
+/// Dental procedures extracted from carrier documents
+/// Procedures mentioned in carrier documentation
+model DocumentProcedure {
+  id                     BigInt    @id @default(autoincrement())
+  /// Reference to the source document
+  documentId             BigInt    @map("document_id")
+  /// Procedure code mentioned in the document
+  procedureCode          String    @map("procedure_code")
+  /// Description of the procedure from the document
+  description            String?
+  /// Submission requirements mentioned in the document
+  submissionRequirements String?   @map("submission_requirements")
+  /// Whether documentation is required for this procedure
+  documentationRequired  Boolean   @default(false) @map("documentation_required")
+  /// When the procedure reference was first extracted
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the procedure reference information was last updated
+  updatedAt              DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The source document this procedure was extracted from
+  document               CarrierDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, procedureCode])
+  @@map("document_procedures")
+  @@index([documentId], name: "idx_doc_proc_document_id")
+  @@index([procedureCode], name: "idx_doc_proc_procedure_code")
+}
+
+/// Guidelines extracted from carrier documents for policies and procedures
+/// Structured insurance guidelines with vector embeddings for semantic search
+model Guideline {
+  id         BigInt    @id @default(autoincrement())
+  /// Optional reference to the carrier this guideline applies to
+  carrierId  BigInt?   @map("carrier_id")
+  /// Optional reference to the source document
+  documentId BigInt?   @map("document_id")
+  /// Title or heading of the guideline
+  title      String
+  /// Full text content of the guideline
+  content    String
+  /// Category or classification of the guideline
+  category   String?
+  /// Additional metadata about the guideline (JSON)
+  metadata   Json?     @db.JsonB
+  /// Vector embedding for semantic search (OpenAI embedding)
+  embedding  Unsupported("vector(1536)")? @db.Vector(1536)
+  /// When the guideline was first added to the system
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the guideline information was last updated
+  updatedAt  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  /// The source document this guideline was extracted from (if applicable)
+  document   CarrierDocument? @relation(fields: [documentId], references: [id])
+
+  @@map("guidelines")
+  @@index([carrierId], name: "idx_guideline_carrier_id")
+  @@index([documentId], name: "idx_guideline_document_id")
+  @@index([category], name: "idx_guideline_category")
+  // Full text search index for title and content
+  @@index([title, content], type: Gist, name: "idx_guideline_fulltext")
+  // Vector similarity index for semantic search
+  @@index([embedding(ops: "vector_l2_ops")], type: IvfFlat, name: "idx_guideline_embedding")
+}
+
+/// Stores uploaded JSON files with their content and metadata
+/// Used for importing data from JSON files
+model JsonUpload {
+  id         BigInt    @id @default(autoincrement())
+  /// Original filename of the uploaded JSON file
+  fileName   String    @map("file_name")
+  /// The JSON content of the file
+  content    Json      @db.JsonB
+  /// When the file was uploaded
+  uploadedAt DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  @@map("json_uploads")
+  @@index([fileName], name: "idx_json_uploads_file_name")
 }

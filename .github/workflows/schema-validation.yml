@@ -1,0 +1,66 @@
+name: Prisma Schema Validation
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Run weekly on Monday at midnight
+  push:
+    paths:
+      - 'prisma/schema.prisma'
+      - 'supabase/migrations/**'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Validate Prisma Schema
+      run: |
+        # Create a temporary validation script
+        echo "import { PrismaClient } from '@prisma/client'; 
+        const prisma = new PrismaClient();
+        async function validateSchema() {
+          try {
+            // Test a simple query to validate schema
+            await prisma.carrier.findFirst();
+            console.log('Schema validation successful');
+            process.exit(0);
+          } catch (error) {
+            console.error('Schema validation failed:', error);
+            process.exit(1);
+          } finally {
+            await prisma.$disconnect();
+          }
+        }
+        validateSchema();" > validate-schema.js
+        node validate-schema.js
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    
+    - name: Check for Schema Drift
+      run: |
+        # Pull the current schema from the database and compare with the committed schema
+        npx prisma db pull --schema=prisma/temp-schema.prisma
+        
+        # Compare schemas (simplified comparison)
+        if diff -q prisma/schema.prisma prisma/temp-schema.prisma > /dev/null; then
+          echo "No schema drift detected"
+        else
+          echo "Schema drift detected. The database schema differs from the Prisma schema."
+          echo "Run 'prisma db pull' locally to update your schema."
+          diff prisma/schema.prisma prisma/temp-schema.prisma || true
+          exit 1
+        fi
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}

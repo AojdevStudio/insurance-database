@@ -4,13 +4,37 @@
 import request from 'supertest';
 import app from '../../../src/api/app.js';
 import { prisma } from '../../../src/lib/prisma.js';
+import { 
+  seedTestCarriers, 
+  seedTestProcedures, 
+  seedTestRequirements,
+  cleanupTestData 
+} from '../../utils/test-data.js';
 
 // Sample test API key for testing
 const TEST_API_KEY = 'test-api-key';
 
-// Close the Prisma client after all tests
+// Test data
+let testCarrierIds: number[] = [];
+let testProcedureCodes: string[] = [];
+
+// Set up test data before all tests
+beforeAll(async () => {
+  // Seed test data
+  testCarrierIds = await seedTestCarriers();
+  testProcedureCodes = await seedTestProcedures();
+  const requirementsCount = await seedTestRequirements(testCarrierIds);
+  
+  console.log(`Seeded ${testCarrierIds.length} carriers, ${testProcedureCodes.length} procedures, and ${requirementsCount} requirements for tests`);
+});
+
+// Clean up test data after all tests
 afterAll(async () => {
+  // Clean up test data
+  await cleanupTestData();
+  // Disconnect Prisma client
   await prisma.$disconnect();
+  console.log('Cleaned up test data and disconnected Prisma client');
 });
 
 describe('Prisma Procedure API Integration Tests', () => {
@@ -150,26 +174,10 @@ describe('Prisma Procedure API Integration Tests', () => {
   });
 
   describe('GET /api/prisma/procedures/:code/requirements', () => {
-    let testProcedureCode: string;
-
-    // Find a procedure code to test with
-    beforeAll(async () => {
-      const procedure = await prisma.procedure.findFirst({
-        where: {
-          requirements: {
-            some: {}
-          }
-        },
-        include: {
-          requirements: true
-        }
-      });
-      
-      // If no procedure with requirements is found, use a known code
-      testProcedureCode = procedure?.code || 'D0120';
-    });
-
     it('should get requirements for a procedure', async () => {
+      // Use one of our test procedure codes with requirements
+      const testProcedureCode = 'D0120';
+      
       const response = await request(app)
         .get(`/api/prisma/procedures/${testProcedureCode}/requirements`)
         .set('X-API-Key', TEST_API_KEY);
@@ -177,28 +185,55 @@ describe('Prisma Procedure API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('requirements');
       expect(Array.isArray(response.body.requirements)).toBe(true);
+      expect(response.body.requirements.length).toBeGreaterThan(0);
     });
 
     it('should filter requirements by carrier', async () => {
-      // First get a valid carrier from the database
-      const carrier = await prisma.insuranceCarrier.findFirst();
+      // Use one of our test procedure codes and carrier IDs
+      const testProcedureCode = 'D0120';
+      const testCarrierId = testCarrierIds[0];
       
-      if (carrier) {
-        const response = await request(app)
-          .get(`/api/prisma/procedures/${testProcedureCode}/requirements`)
-          .query({ carrier_id: carrier.id })
-          .set('X-API-Key', TEST_API_KEY);
+      const response = await request(app)
+        .get(`/api/prisma/procedures/${testProcedureCode}/requirements`)
+        .query({ carrier_id: testCarrierId })
+        .set('X-API-Key', TEST_API_KEY);
 
-        expect(response.status).toBe(200);
-        expect(response.body).toHaveProperty('requirements');
-        
-        // If there are any requirements, check they're for the right carrier
-        response.body.requirements.forEach((req) => {
-          if (req.carrier_id) {
-            expect(req.carrier_id).toBe(carrier.id);
-          }
-        });
-      }
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('requirements');
+      
+      // Verify all requirements are for the specified carrier
+      response.body.requirements.forEach((req) => {
+        expect(req.carrier_id).toBe(testCarrierId);
+      });
+      
+      // Verify at least one requirement was returned
+      expect(response.body.requirements.length).toBeGreaterThan(0);
+    });
+    
+    it('should return empty array when procedure has no requirements for specified carrier', async () => {
+      // Test with a procedure-carrier combination that has no requirements
+      // D0150 should have no requirements for carrier[1]
+      const testProcedureCode = 'D0150';
+      const testCarrierId = testCarrierIds[1];
+      
+      const response = await request(app)
+        .get(`/api/prisma/procedures/${testProcedureCode}/requirements`)
+        .query({ carrier_id: testCarrierId })
+        .set('X-API-Key', TEST_API_KEY);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('requirements');
+      expect(Array.isArray(response.body.requirements)).toBe(true);
+      expect(response.body.requirements.length).toBe(0);
+    });
+    
+    it('should handle invalid procedure code', async () => {
+      const response = await request(app)
+        .get('/api/prisma/procedures/INVALID_CODE/requirements')
+        .set('X-API-Key', TEST_API_KEY);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error');
     });
   });
 

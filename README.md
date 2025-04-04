@@ -1,110 +1,143 @@
-# Insurance Database Project
+# Insurance Database
 
-A comprehensive database system for dental insurance information with a focus on modeling network-carrier-plan hierarchies.
+A comprehensive dental insurance database system with network-carrier-plan hierarchy modeling, vector search capabilities, and Prisma ORM integration.
 
 ## Features
 
 - Network-carrier-plan hierarchical structure
 - Procedure requirement tracking
 - Documentation guidelines
-- Vector search for semantic queries
+- Vector search for semantic querying
 - Integration with AI agents
 - Prisma ORM for type-safe database access
+- Optimized query performance with specialized indexes
+- Redis caching for improved response times
 
 ## Setup
 
 ### Prerequisites
 
 - Node.js 18+
-- Docker and Docker Compose (for local development)
-- Supabase account (for production)
+- PostgreSQL database (local or cloud)
+- Redis (for caching)
+- Docker (for local development)
 
 ### Installation
 
-1. Clone the repository
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/insurance-database.git
+   cd insurance-database
+   ```
+
 2. Install dependencies:
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-3. Setup environment variables by copying `.env.example` to `.env` and updating the values
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+   Update the `.env` file with your database connection details.
 
-4. Start the local database:
-```bash
-docker-compose up -d
-```
+4. Start local development environment:
+   ```bash
+   docker-compose up -d
+   ```
 
-5. Run database migrations:
-```bash
-npm run supabase migration up
-```
+5. Generate Prisma client:
+   ```bash
+   npm run prisma:generate
+   ```
 
-6. Generate Prisma client:
-```bash
-npm run prisma:generate
-```
+6. Run database migrations:
+   ```bash
+   supabase db reset
+   ```
 
-## Database Connection
-
-The project uses Prisma ORM to interact with the database. The connection is configured via the `DATABASE_URL` environment variable:
-
-### Local Development
-```
-DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres?schema=public"
-```
-
-### Production (Supabase)
-```
-DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@YOUR_INSTANCE.supabase.co:5432/postgres?schema=public"
-```
-
-## Development
-
-### Database Operations
-
-- Pull database schema: `npm run prisma:pull`
-- Generate Prisma client: `npm run prisma:generate`
-- Open Prisma Studio: `npm run prisma:studio`
-- Combined pull and generate: `npm run db:pull-generate`
-
-### Building and Running
-
-- Development mode: `npm run dev`
-- Build: `npm run build`
-- Start: `npm run start`
+7. Start the application:
+   ```bash
+   npm run dev
+   ```
 
 ## API Endpoints
 
-The project provides two sets of API endpoints:
+The API provides access to insurance carriers, procedures, and guidelines:
 
-### Supabase API (Original)
-- `/api/carriers/*` - Carrier endpoints
-- `/api/procedures/*` - Procedure endpoints  
-- `/api/guidelines/*` - Guidelines endpoints
+- `/api/carriers` - Insurance carrier management
+- `/api/procedures` - Dental procedure code lookup
+- `/api/guidelines` - Documentation requirements and policies
 
-### Prisma API (New Implementation)
-- `/api/prisma/carriers/*` - Prisma-based carrier endpoints
-- `/api/prisma/procedures/*` - Prisma-based procedure endpoints
-- `/api/prisma/guidelines/*` - Prisma-based guidelines endpoints
+Prisma-powered endpoints are available at:
 
-## Schema Management
+- `/api/prisma/carriers` - Prisma implementation of carrier endpoints
+- `/api/prisma/procedures` - Prisma implementation of procedure endpoints
+- `/api/prisma/guidelines` - Prisma implementation of guideline endpoints
 
-This project uses a SQL-first approach to schema management:
+## Development
 
-1. SQL migrations (in `supabase/migrations/`) are the source of truth for schema changes
-2. Prisma schema is generated from the database using `prisma db pull`
-3. After schema changes, run `npm run db:pull-generate` to update the Prisma client
+### Database Management
 
-For detailed workflow information, see [Prisma Schema Workflow](docs/development/prisma-schema-workflow.md).
+This project follows a SQL-first approach with Prisma as an ORM:
 
-## Documentation
+1. Make schema changes in SQL migration files (`supabase/migrations/`)
+2. Apply migrations to your database (`supabase db reset` or `supabase migration up`)
+3. Sync Prisma schema (`npm run prisma:pull`)
+4. Generate Prisma client (`npm run prisma:generate`)
 
-- [CHANGELOG](CHANGELOG.md) - Project history and changes
-- [Prisma Schema Workflow](docs/development/prisma-schema-workflow.md) - How to manage database schema changes
-- [Prisma Phase 4 Completion](docs/development/prisma-phase4-completion.md) - Implementation details of service layer migration
-- [Prisma Phase 5 Completion](docs/development/prisma-phase5-completion.md) - API layer updates and middleware implementations
+See [Prisma Schema Workflow](./docs/development/prisma-schema-workflow.md) for details.
 
-## Testing
+### Performance Optimization
 
-- Run tests: `npm test`
-- Run tests with coverage: `npm run test:coverage`
+The project includes several performance optimizations:
+
+- Specialized database indexes for text and vector search
+- Query optimization techniques with selective field fetching
+- Connection pooling with retry logic
+- Redis caching with smart invalidation
+- Monitoring middleware for query performance
+
+See [Performance Optimization](./docs/development/prisma-phase7-completion.md) for details on implementation.
+
+### Testing
+
+Run the test suite with:
+
+```bash
+npm test
+```
+
+Run specific test types:
+
+```bash
+# Unit tests
+npm test -- --testPathPattern="unit"
+
+# Integration tests
+npm test -- --testPathPattern="integration"
+
+# Performance tests
+npm run test:perf
+```
+
+## Implementation Status
+
+The Prisma ORM implementation is in progress. Current status:
+
+- ✅ Phase 1: Setup & Configuration
+- ✅ Phase 2: Schema Synchronization
+- ✅ Phase 3: Prisma Client Integration
+- ✅ Phase 4: Service Layer Migration
+- ✅ Phase 5: API Layer Updates
+- ✅ Phase 6: Testing & Validation
+- ✅ Phase 7: Performance Optimization
+- ⬜ Phase 8: Documentation & Knowledge Transfer
+- ⬜ Phase 9: Deployment & CI/CD Updates
+- ⬜ Phase 10: Specific Functionality Implementation
+- ⬜ Phase 11: Final Integration and Rollout
+- ⬜ Phase 12: RAG Integration Updates
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

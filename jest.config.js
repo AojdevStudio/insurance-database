@@ -24,7 +24,10 @@ export default {
       lines: 90,
     },
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: [
+    '**/__tests__/**/*.test.ts',
+    '**/tests/**/*.test.ts'
+  ],
   testTimeout: 30000,
   verbose: true,
   collectCoverageFrom: [

@@ -4,13 +4,31 @@
 import request from 'supertest';
 import app from '../../../src/api/app.js';
 import { prisma } from '../../../src/lib/prisma.js';
+import { 
+  seedTestCarriers, 
+  cleanupTestData 
+} from '../../utils/test-data.js';
 
 // Sample test API key for testing
 const TEST_API_KEY = 'test-api-key';
 
-// Close the Prisma client after all tests
+// Test data
+let testCarrierIds: number[] = [];
+
+// Set up test data before all tests
+beforeAll(async () => {
+  // Seed test carriers
+  testCarrierIds = await seedTestCarriers();
+  console.log(`Seeded ${testCarrierIds.length} test carriers for integration tests`);
+});
+
+// Clean up test data after all tests
 afterAll(async () => {
+  // Clean up test data
+  await cleanupTestData();
+  // Disconnect Prisma client
   await prisma.$disconnect();
+  console.log('Cleaned up test data and disconnected Prisma client');
 });
 
 describe('Prisma Carrier API Integration Tests', () => {
@@ -168,6 +186,91 @@ describe('Prisma Carrier API Integration Tests', () => {
           expect.arrayContaining(Object.keys(supabaseCarrier))
         );
       }
+    });
+  });
+  
+  // Tests for Prisma-specific error handling
+  describe('Prisma Error Handling', () => {
+    // Test endpoint for creating carriers - this would need to be added to your API
+    // For this test, assume it exists at POST /api/prisma/carriers
+    const createEndpoint = '/api/prisma/carriers';
+    
+    it('should handle validation errors correctly', async () => {
+      // Invalid data (missing required fields)
+      const invalidData = {
+        name: '' // Empty name should fail validation
+      };
+      
+      const response = await request(app)
+        .post(createEndpoint)
+        .set('X-API-Key', TEST_API_KEY)
+        .send(invalidData);
+      
+      // Should return 400 Bad Request
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+    
+    it('should handle unique constraint violations', async () => {
+      // First, get an existing carrier
+      const existingCarrier = await prisma.insuranceCarrier.findFirst({
+        where: { id: testCarrierIds[0] }
+      });
+      
+      if (existingCarrier) {
+        // Try to create a carrier with the same payer_id (should violate unique constraint)
+        const duplicateData = {
+          name: 'Duplicate Carrier',
+          payer_id: existingCarrier.payer_id,
+          address: '123 Duplicate St, Testville, TX 12345',
+          phone: '555-000-0000',
+          network_id: 1
+        };
+        
+        const response = await request(app)
+          .post(createEndpoint)
+          .set('X-API-Key', TEST_API_KEY)
+          .send(duplicateData);
+        
+        // Should return 409 Conflict due to our Prisma error middleware
+        expect(response.status).toBe(409);
+        expect(response.body.error).toHaveProperty('code', 'UNIQUE_CONSTRAINT_VIOLATION');
+      }
+    });
+  });
+  
+  // Performance comparison tests
+  describe('Performance Comparison', () => {
+    it('should be comparable in performance to Supabase implementation', async () => {
+      // Warmup
+      await request(app).get('/api/carriers').set('X-API-Key', TEST_API_KEY);
+      await request(app).get('/api/prisma/carriers').set('X-API-Key', TEST_API_KEY);
+      
+      // Test Supabase implementation (5 runs)
+      const supabaseTimes = [];
+      for (let i = 0; i < 5; i++) {
+        const startTime = Date.now();
+        await request(app).get('/api/carriers').set('X-API-Key', TEST_API_KEY);
+        supabaseTimes.push(Date.now() - startTime);
+      }
+      
+      // Test Prisma implementation (5 runs)
+      const prismaTimes = [];
+      for (let i = 0; i < 5; i++) {
+        const startTime = Date.now();
+        await request(app).get('/api/prisma/carriers').set('X-API-Key', TEST_API_KEY);
+        prismaTimes.push(Date.now() - startTime);
+      }
+      
+      // Calculate averages
+      const supabaseAvg = supabaseTimes.reduce((a, b) => a + b, 0) / supabaseTimes.length;
+      const prismaAvg = prismaTimes.reduce((a, b) => a + b, 0) / prismaTimes.length;
+      
+      console.log(`Performance comparison: Supabase avg: ${supabaseAvg.toFixed(2)}ms, Prisma avg: ${prismaAvg.toFixed(2)}ms`);
+      
+      // This is not a strict test as performance can vary, but log for analysis
+      // For very poor performance, we might want to assert something
+      expect(prismaAvg).toBeLessThan(supabaseAvg * 2); // Prisma should not be more than 2x slower
     });
   });
 });

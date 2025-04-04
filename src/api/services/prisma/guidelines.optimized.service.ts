@@ -5,11 +5,11 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma-optimized.js';
-import { 
-  IGuideline, 
-  IGuidelineSearchQuery, 
-  IGuidelineSearchResponse, 
-  IGuidelineSearchResult 
+import {
+  IGuideline,
+  IGuidelineSearchQuery,
+  IGuidelineSearchResponse,
+  IGuidelineSearchResult
 } from '../../types/guidelines.js';
 import { logger } from '../../utils/logger.js';
 import { OpenAIService } from '../openai.service.js';
@@ -20,7 +20,7 @@ export class OptimizedGuidelineService {
   private static readonly DEFAULT_TEXT_WEIGHT = 0.3;
   private static readonly DEFAULT_VECTOR_WEIGHT = 0.7;
   private static readonly DEFAULT_RRF_K = 60.0;
-  
+
   /**
    * Format guideline result with proper type conversions
    */
@@ -74,10 +74,10 @@ export class OptimizedGuidelineService {
     } = options;
 
     // Generate cache key based on query parameters
-    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:search', { 
-      query, carrier_id, category, page, limit 
+    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:search', {
+      query, carrier_id, category, page, limit
     });
-    
+
     // Return cached result if available
     const cached = await PrismaOptimizationService.getFromCache<IGuidelineSearchResponse>(cacheKey);
     if (cached) return cached;
@@ -85,12 +85,12 @@ export class OptimizedGuidelineService {
     // Ensure numeric types
     const pageNum = Number(page);
     const limitNum = Number(limit);
-    
+
     // Get pagination parameters
     const pagination = PrismaOptimizationService.getPaginationParams(
-      pageNum, 
-      limitNum, 
-      'created_at', 
+      pageNum,
+      limitNum,
+      'created_at',
       'desc'
     );
 
@@ -102,7 +102,7 @@ export class OptimizedGuidelineService {
         try {
           // Build where clause for filtering
           const where: Prisma.GuidelineWhereInput = {};
-          
+
           // Apply text search if query provided
           if (query) {
             where.OR = [
@@ -110,7 +110,7 @@ export class OptimizedGuidelineService {
               { content: { contains: query, mode: 'insensitive' } }
             ];
           }
-          
+
           // Apply carrier filter if provided
           if (carrier_id) {
             where.carrier_id = Number(carrier_id);
@@ -169,9 +169,9 @@ export class OptimizedGuidelineService {
   /**
    * Semantic search using vector embeddings
    * Performance optimized with:
-   * - Optimized vector index
-   * - Raw SQL queries
-   * - Query batching
+   * - Optimized vector index (IVF-Flat)
+   * - Specialized database function
+   * - Efficient caching
    * - Selective result fields
    */
   static async semanticSearch(options: IGuidelineSearchQuery): Promise<IGuidelineSearchResponse> {
@@ -188,10 +188,10 @@ export class OptimizedGuidelineService {
     }
 
     // Generate cache key
-    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:semantic', { 
+    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:semantic', {
       query, carrier_id, category, limit, min_similarity
     });
-    
+
     // Check cache
     const cached = await PrismaOptimizationService.getFromCache<IGuidelineSearchResponse>(cacheKey);
     if (cached) return cached;
@@ -204,37 +204,23 @@ export class OptimizedGuidelineService {
           // Get query embedding from OpenAI
           const embedding = await OpenAIService.createEmbedding(query);
 
-          // Build WHERE clause for carrier and category filtering
-          let whereClause: Prisma.Sql | undefined;
-          const conditions: Prisma.Sql[] = [];
-          
-          if (carrier_id !== undefined) {
-            conditions.push(Prisma.sql`g.carrier_id = ${Number(carrier_id)}`);
-          }
-          
-          if (category) {
-            conditions.push(Prisma.sql`g.category = ${category}`);
-          }
-          
-          if (conditions.length > 0) {
-            whereClause = PrismaOptimizationService.combineConditions(conditions);
-          }
-
-          // Perform optimized vector search
-          const guidelines = await PrismaOptimizationService.vectorSimilaritySearch<IGuidelineSearchResult>(
-            'guidelines g',
-            embedding,
-            {
-              limit: Number(limit),
-              minSimilarity: Number(min_similarity),
-              selectFields: ['id', 'title', 'content', 'carrier_id', 'category', 'created_at'],
-              whereClause
-            }
-          );
+          // Use the optimized database function for vector search
+          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>`
+            SELECT * FROM vector_similarity_search(
+              ${embedding}::vector,
+              ${Number(min_similarity)}::float,
+              ${Number(limit)}::int,
+              ${carrier_id ? Number(carrier_id) : null}::bigint,
+              ${category || null}::text
+            )
+          `;
 
           // Format the response
           const result: IGuidelineSearchResponse = {
-            guidelines: guidelines.map(g => this.formatGuideline(g)),
+            guidelines: guidelines.map(g => ({
+              ...this.formatGuideline(g),
+              vector_similarity: g.similarity
+            })),
             total: guidelines.length,
             page: 1,
             limit: Number(limit),
@@ -254,7 +240,8 @@ export class OptimizedGuidelineService {
    * Text search using PostgreSQL text search capabilities
    * Performance optimized with:
    * - Optimized trigram indexes
-   * - Caching
+   * - Specialized database function
+   * - Efficient caching
    * - Selective field projection
    */
   static async textSearch(options: IGuidelineSearchQuery): Promise<IGuidelineSearchResponse> {
@@ -271,10 +258,10 @@ export class OptimizedGuidelineService {
     }
 
     // Generate cache key
-    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:text', { 
+    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:text', {
       ...options,
     });
-    
+
     // Check cache
     const cached = await PrismaOptimizationService.getFromCache<IGuidelineSearchResponse>(cacheKey);
     if (cached) return cached;
@@ -284,54 +271,22 @@ export class OptimizedGuidelineService {
       cacheKey,
       async () => {
         try {
-          // Build SQL query for text search using pg_trgm similarity with index usage
-          let sql = `
-            SELECT 
-              g.id, 
-              g.title, 
-              g.content, 
-              g.carrier_id, 
-              g.category,
-              g.created_at,
-              similarity(g.content, $1) as text_similarity
-            FROM "guidelines" g
-            WHERE similarity(g.content, $1) > $2
+          // Use the optimized database function for fuzzy text search
+          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>`
+            SELECT * FROM fuzzy_text_search(
+              ${query}::text,
+              ${Number(min_similarity)}::float,
+              ${Number(limit)}::int,
+              ${carrier_id ? Number(carrier_id) : null}::bigint,
+              ${category || null}::text
+            )
           `;
-
-          const params: any[] = [query, min_similarity];
-          let paramIndex = 3;  // Next parameter index
-
-          // Add carrier filter if provided
-          if (carrier_id !== undefined) {
-            sql += ` AND g.carrier_id = $${paramIndex}`;
-            params.push(Number(carrier_id));
-            paramIndex++;
-          }
-
-          // Add category filter if provided
-          if (category) {
-            sql += ` AND g.category = $${paramIndex}`;
-            params.push(category);
-            paramIndex++;
-          }
-
-          // Add order by and limit
-          sql += `
-            ORDER BY text_similarity DESC
-            LIMIT $${paramIndex}
-          `;
-          params.push(Number(limit));
-
-          // Execute raw query
-          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>(
-            Prisma.sql([sql, ...params])
-          );
 
           // Format the response
           const result: IGuidelineSearchResponse = {
             guidelines: guidelines.map(g => ({
               ...this.formatGuideline(g),
-              text_similarity: g.text_similarity
+              text_similarity: g.similarity
             })),
             total: guidelines.length,
             page: 1,
@@ -351,9 +306,10 @@ export class OptimizedGuidelineService {
   /**
    * Hybrid search combining vector and text search
    * Performance optimized with:
-   * - Batch processing for vector embeddings
-   * - Smart caching for repeat queries
+   * - Specialized database function
    * - Optimized combined scoring formula
+   * - Smart caching for repeat queries
+   * - Efficient query execution plan
    */
   static async hybridSearch(options: IGuidelineSearchQuery): Promise<IGuidelineSearchResponse> {
     const {
@@ -371,10 +327,10 @@ export class OptimizedGuidelineService {
     }
 
     // Generate cache key
-    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:hybrid', { 
+    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:hybrid', {
       ...options
     });
-    
+
     // Check cache
     const cached = await PrismaOptimizationService.getFromCache<IGuidelineSearchResponse>(cacheKey);
     if (cached) return cached;
@@ -387,73 +343,19 @@ export class OptimizedGuidelineService {
           // Get query embedding from OpenAI
           const embedding = await OpenAIService.createEmbedding(query);
 
-          // Build SQL query for hybrid search with optimized formula
-          let sql = `
-            WITH text_matches AS (
-              SELECT 
-                id, 
-                similarity(content, $1) as text_score
-              FROM guidelines
-              WHERE similarity(content, $1) > $5
-            ),
-            vector_matches AS (
-              SELECT 
-                id, 
-                1 - (embedding <=> $2) as vector_score
-              FROM guidelines
-              WHERE embedding <=> $2 < $5
+          // Use the optimized database function for hybrid search
+          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>`
+            SELECT * FROM hybrid_search(
+              ${query}::text,
+              ${embedding}::vector,
+              ${Number(text_weight)}::float,
+              ${Number(vector_weight)}::float,
+              ${Number(min_similarity)}::float,
+              ${Number(limit)}::int,
+              ${carrier_id ? Number(carrier_id) : null}::bigint,
+              ${category || null}::text
             )
-            SELECT 
-              g.id, 
-              g.title, 
-              g.content, 
-              g.carrier_id, 
-              g.category,
-              g.created_at,
-              COALESCE(tm.text_score, 0) as text_similarity,
-              COALESCE(vm.vector_score, 0) as vector_similarity,
-              ($3 * COALESCE(tm.text_score, 0)) + ($4 * COALESCE(vm.vector_score, 0)) as combined_similarity
-            FROM guidelines g
-            LEFT JOIN text_matches tm ON g.id = tm.id
-            LEFT JOIN vector_matches vm ON g.id = vm.id
-            WHERE 
-              tm.id IS NOT NULL OR vm.id IS NOT NULL
           `;
-
-          const params: any[] = [
-            query, 
-            embedding, 
-            text_weight, 
-            vector_weight,
-            min_similarity
-          ];
-          let paramIndex = 6;  // Next parameter index
-
-          // Add carrier filter if provided
-          if (carrier_id !== undefined) {
-            sql += ` AND g.carrier_id = $${paramIndex}`;
-            params.push(Number(carrier_id));
-            paramIndex++;
-          }
-
-          // Add category filter if provided
-          if (category) {
-            sql += ` AND g.category = $${paramIndex}`;
-            params.push(category);
-            paramIndex++;
-          }
-
-          // Add order by and limit
-          sql += `
-            ORDER BY combined_similarity DESC
-            LIMIT $${paramIndex}
-          `;
-          params.push(Number(limit));
-
-          // Execute raw query with optimized parameters
-          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>(
-            Prisma.sql([sql, ...params])
-          );
 
           // Format the response
           const result: IGuidelineSearchResponse = {
@@ -481,9 +383,10 @@ export class OptimizedGuidelineService {
   /**
    * Reciprocal Rank Fusion (RRF) based hybrid search
    * Performance optimized with:
-   * - Common Table Expressions (CTEs) for better query execution plans
-   * - Specialized indexing for RRF operations
-   * - Optimized query structure for PostgreSQL query planner
+   * - Specialized database function
+   * - Optimized query execution plan
+   * - Efficient caching strategy
+   * - Improved ranking algorithm
    */
   static async rrf_hybridSearch(options: IGuidelineSearchQuery): Promise<IGuidelineSearchResponse> {
     const {
@@ -500,10 +403,10 @@ export class OptimizedGuidelineService {
     }
 
     // Generate cache key
-    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:rrf_hybrid', { 
+    const cacheKey = await PrismaOptimizationService.getCacheKey('guidelines:rrf_hybrid', {
       ...options
     });
-    
+
     // Check cache
     const cached = await PrismaOptimizationService.getFromCache<IGuidelineSearchResponse>(cacheKey);
     if (cached) return cached;
@@ -516,107 +419,18 @@ export class OptimizedGuidelineService {
           // Get query embedding from OpenAI
           const embedding = await OpenAIService.createEmbedding(query);
 
-          // Build optimized SQL query for RRF hybrid search
-          let sql = `
-            WITH candidate_ids AS (
-              -- Pre-filter potential candidates to reduce ranking workload
-              SELECT id FROM guidelines g
-              WHERE 
-                similarity(g.content, $1) > $3 OR
-                g.embedding <=> $2 < $3
-              LIMIT 500
-            ),
-            text_ranks AS (
-              -- Rank by text similarity
-              SELECT 
-                g.id, 
-                ROW_NUMBER() OVER (ORDER BY similarity(g.content, $1) DESC) as text_rank,
-                similarity(g.content, $1) as text_score
-              FROM guidelines g
-              JOIN candidate_ids c ON g.id = c.id
-              WHERE similarity(g.content, $1) > $3
-            ),
-            vector_ranks AS (
-              -- Rank by vector similarity
-              SELECT 
-                g.id, 
-                ROW_NUMBER() OVER (ORDER BY g.embedding <=> $2) as vector_rank,
-                1 - (g.embedding <=> $2) as vector_score
-              FROM guidelines g
-              JOIN candidate_ids c ON g.id = c.id
-              WHERE g.embedding <=> $2 < $3
-            ),
-            combined_ranks AS (
-              -- Calculate RRF score
-              SELECT 
-                g.id,
-                COALESCE(1.0 / ($4 + tr.text_rank), 0) + COALESCE(1.0 / ($4 + vr.vector_rank), 0) as rrf_score,
-                tr.text_score,
-                vr.vector_score,
-                CASE 
-                  WHEN tr.text_rank IS NOT NULL AND vr.vector_rank IS NOT NULL THEN 'Found by both text and vector search'
-                  WHEN tr.text_rank IS NOT NULL THEN 'Found by text search only'
-                  WHEN vr.vector_rank IS NOT NULL THEN 'Found by vector search only'
-                  ELSE 'Unknown match reason'
-                END as explanation
-              FROM guidelines g
-              JOIN candidate_ids c ON g.id = c.id
-              LEFT JOIN text_ranks tr ON g.id = tr.id
-              LEFT JOIN vector_ranks vr ON g.id = vr.id
-              WHERE tr.id IS NOT NULL OR vr.id IS NOT NULL
-              ORDER BY rrf_score DESC
-              LIMIT $5
+          // Use the optimized database function for RRF hybrid search
+          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>`
+            SELECT * FROM rrf_hybrid_search(
+              ${query}::text,
+              ${embedding}::vector,
+              ${Number(rrf_k)}::float,
+              ${Number(min_similarity)}::float,
+              ${Number(limit)}::int,
+              ${carrier_id ? Number(carrier_id) : null}::bigint,
+              ${category || null}::text
             )
-            -- Final result with all needed fields
-            SELECT 
-              g.id, 
-              g.title, 
-              g.content, 
-              g.carrier_id, 
-              g.category,
-              g.created_at,
-              cr.text_score as text_similarity,
-              cr.vector_score as vector_similarity,
-              cr.rrf_score,
-              cr.explanation
-            FROM combined_ranks cr
-            JOIN guidelines g ON cr.id = g.id
           `;
-
-          const params: any[] = [
-            query, 
-            embedding, 
-            min_similarity, 
-            rrf_k,
-            Number(limit)
-          ];
-          
-          // Add WHERE clause for carrier and category filters
-          const conditions: string[] = [];
-          let paramIndex = 6;
-          
-          if (carrier_id !== undefined) {
-            conditions.push(`g.carrier_id = $${paramIndex}`);
-            params.push(Number(carrier_id));
-            paramIndex++;
-          }
-          
-          if (category) {
-            conditions.push(`g.category = $${paramIndex}`);
-            params.push(category);
-            paramIndex++;
-          }
-          
-          if (conditions.length > 0) {
-            sql += ` WHERE ${conditions.join(' AND ')}`;
-          }
-          
-          sql += ` ORDER BY cr.rrf_score DESC`;
-
-          // Execute optimized raw query
-          const guidelines = await prisma.$queryRaw<IGuidelineSearchResult[]>(
-            Prisma.sql([sql, ...params])
-          );
 
           // Format the response
           const result: IGuidelineSearchResponse = {
@@ -655,10 +469,10 @@ export class OptimizedGuidelineService {
 
     // Log search parameters for analysis
     logger.debug(`Search requested with type: ${search_type}`, options);
-    
+
     try {
       let result: IGuidelineSearchResponse;
-      
+
       // Route to appropriate search method
       switch (search_type) {
         case 'rrf_hybrid':
@@ -676,17 +490,17 @@ export class OptimizedGuidelineService {
         default:
           throw new Error(`Invalid search type: ${search_type}`);
       }
-      
+
       // Log search result summary for performance analysis
       logger.debug(`Search completed with type: ${search_type}, found ${result.total} results`);
-      
+
       return result;
     } catch (error) {
       logger.error(`Error in unified search (${search_type}):`, error);
       throw error;
     }
   }
-  
+
   /**
    * Invalidate all guidelines search caches
    * Used when guidelines data is updated
@@ -694,7 +508,7 @@ export class OptimizedGuidelineService {
   static async invalidateSearchCaches(): Promise<void> {
     await PrismaOptimizationService.invalidateCache('prisma:guidelines:*');
   }
-  
+
   /**
    * Get guideline by ID with optimized field selection
    */
@@ -711,7 +525,7 @@ export class OptimizedGuidelineService {
           created_at: true
         }
       });
-      
+
       return guideline ? {
         id: guideline.id as number,
         title: guideline.title,

@@ -12,6 +12,7 @@ import { AuditLogService } from '../services/auditLog.service.js';
 import carrierRoutes from './routes/carrier.routes.js';
 import procedureRoutes from './routes/procedure.routes.js';
 import guidelinesRoutes from './routes/guidelines.routes.js';
+import fuzzySearchRoutes from './routes/fuzzy-search.routes.js';
 import prismaCarrierRoutes from './routes/prisma/carrier.routes.js';
 import prismaProcedureRoutes from './routes/prisma/procedure.routes.js';
 import prismaGuidelinesRoutes from './routes/prisma/guidelines.routes.js';
@@ -79,6 +80,7 @@ app.get('/health', (req, res) => {
 app.use('/api/carriers', carrierRoutes);
 app.use('/api/procedures', procedureRoutes);
 app.use('/api/guidelines', guidelinesRoutes);
+app.use('/api/fuzzy-search', fuzzySearchRoutes);
 
 // Prisma API routes (for testing and comparison)
 app.use('/api/prisma/carriers', prismaCarrierRoutes);

@@ -252,4 +252,60 @@ export class FuzzySearchController {
       });
     }
   }
+
+  /**
+   * Find procedures by code with various search strategies
+   */
+  static async findProceduresByCode(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        code,
+        searchType,
+        limit,
+        offset,
+        category,
+        includeRequirements,
+        minScore
+      } = req.query;
+
+      if (!code || typeof code !== 'string') {
+        res.status(400).json({ error: 'Code parameter is required' });
+        return;
+      }
+
+      // Validate search type
+      const validSearchTypes = ['exact', 'prefix', 'suffix', 'contains', 'fuzzy'];
+      if (searchType && typeof searchType === 'string' && !validSearchTypes.includes(searchType)) {
+        res.status(400).json({
+          error: 'Invalid search type',
+          validOptions: validSearchTypes
+        });
+        return;
+      }
+
+      const options = {
+        searchType: searchType as 'exact' | 'prefix' | 'suffix' | 'contains' | 'fuzzy' | undefined,
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+        category: category ? String(category) : undefined,
+        includeRequirements: includeRequirements === 'true',
+        minScore: minScore ? Number(minScore) : undefined
+      };
+
+      const results = await FuzzyMatchingService.findProceduresByCode(code, options);
+
+      res.json({
+        success: true,
+        results,
+        count: results.length,
+        searchType: options.searchType || 'contains'
+      });
+    } catch (error) {
+      logger.error('Error in findProceduresByCode:', error);
+      res.status(500).json({
+        error: 'Failed to perform procedure code search',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 }

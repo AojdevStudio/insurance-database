@@ -84,4 +84,18 @@ router.get('/carrier-in-network/:carrierId/:networkId', FuzzySearchController.is
  */
 router.get('/full-text', FuzzySearchController.fullTextSearch);
 
+/**
+ * @route   GET /api/fuzzy-search/procedures/code
+ * @desc    Find procedures by code with various search strategies
+ * @access  Public
+ * @query   {string} code - The procedure code to search for
+ * @query   {string} [searchType=contains] - Search strategy: 'exact', 'prefix', 'suffix', 'contains', or 'fuzzy'
+ * @query   {number} [limit=10] - Maximum number of results
+ * @query   {number} [offset=0] - Number of results to skip
+ * @query   {string} [category] - Filter by procedure category
+ * @query   {boolean} [includeRequirements=false] - Include procedure requirements in the response
+ * @query   {number} [minScore=0.3] - Minimum similarity score (for fuzzy search)
+ */
+router.get('/procedures/code', FuzzySearchController.findProceduresByCode);
+
 export default router;

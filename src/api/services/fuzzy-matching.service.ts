@@ -37,6 +37,27 @@ export interface FullTextSearchResult<T> {
   highlights?: string[];
 }
 
+export interface ProcedureSearchOptions {
+  limit?: number;
+  offset?: number;
+  searchType?: 'exact' | 'prefix' | 'suffix' | 'contains' | 'fuzzy';
+  category?: string;
+  includeRequirements?: boolean;
+  minScore?: number;
+}
+
+export interface ProcedureSearchResult {
+  item: {
+    id: number;
+    procedureCode: string;
+    description: string;
+    category: string;
+    requirements?: any[];
+  };
+  score?: number;
+  matchType?: string;
+}
+
 export class FuzzyMatchingService {
   // Default similarity threshold
   private static readonly DEFAULT_THRESHOLD = 0.3;
@@ -88,6 +109,7 @@ export class FuzzyMatchingService {
 
   /**
    * Find procedures by fuzzy code or description matching
+   * This is the original method that uses similarity for fuzzy matching
    */
   static async findProceduresByFuzzyMatch(
     query: string,
@@ -132,6 +154,170 @@ export class FuzzyMatchingService {
     } catch (error) {
       logger.error('Error in fuzzy procedure search:', error);
       throw new Error(`Failed to perform fuzzy procedure search: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Enhanced procedure code search with multiple search strategies
+   * Supports exact, prefix, suffix, contains, and fuzzy matching
+   */
+  static async findProceduresByCode(
+    codePattern: string,
+    options: ProcedureSearchOptions = {}
+  ): Promise<ProcedureSearchResult[]> {
+    const {
+      limit = this.DEFAULT_LIMIT,
+      offset = 0,
+      searchType = 'contains',
+      category,
+      includeRequirements = false,
+      minScore = 0.3
+    } = options;
+
+    try {
+      // Build the query based on the search type
+      let whereClause;
+      let orderByClause;
+      let selectScoreExpr;
+      let matchType;
+
+      switch (searchType) {
+        case 'exact':
+          whereClause = Prisma.sql`p.procedure_code = ${codePattern}`;
+          orderByClause = Prisma.sql`p.procedure_code ASC`;
+          selectScoreExpr = Prisma.sql`1.0 AS score`;
+          matchType = 'exact';
+          break;
+
+        case 'prefix':
+          whereClause = Prisma.sql`p.procedure_code LIKE ${codePattern + '%'}`;
+          orderByClause = Prisma.sql`p.procedure_code ASC`;
+          selectScoreExpr = Prisma.sql`0.9 AS score`;
+          matchType = 'prefix';
+          break;
+
+        case 'suffix':
+          whereClause = Prisma.sql`p.procedure_code LIKE ${'%' + codePattern}`;
+          orderByClause = Prisma.sql`p.procedure_code ASC`;
+          selectScoreExpr = Prisma.sql`0.8 AS score`;
+          matchType = 'suffix';
+          break;
+
+        case 'contains':
+          whereClause = Prisma.sql`p.procedure_code LIKE ${'%' + codePattern + '%'}`;
+          orderByClause = Prisma.sql`p.procedure_code ASC`;
+          selectScoreExpr = Prisma.sql`0.7 AS score`;
+          matchType = 'contains';
+          break;
+
+        case 'fuzzy':
+        default:
+          whereClause = Prisma.sql`similarity(p.procedure_code, ${codePattern}) > ${minScore}`;
+          orderByClause = Prisma.sql`score DESC`;
+          selectScoreExpr = Prisma.sql`similarity(p.procedure_code, ${codePattern}) AS score`;
+          matchType = 'fuzzy';
+          break;
+      }
+
+      // Add category filter if provided
+      if (category) {
+        whereClause = Prisma.sql`${whereClause} AND p.category = ${category}`;
+      }
+
+      // Build the base query
+      let query = Prisma.sql`
+        SELECT
+          p.id,
+          p.procedure_code,
+          p.description,
+          p.category,
+          ${selectScoreExpr}
+        FROM
+          procedure p
+        WHERE
+          ${whereClause}
+        ORDER BY
+          ${orderByClause}
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      // Execute the query
+      const procedures = await prisma.$queryRaw<any[]>(query);
+
+      // If requirements are requested, fetch them for each procedure
+      let proceduresWithRequirements = procedures;
+
+      if (includeRequirements && procedures.length > 0) {
+        // Get all procedure IDs
+        const procedureIds = procedures.map(p => p.id);
+
+        // Fetch requirements for all procedures in a single query
+        const requirements = await prisma.procedureRequirement.findMany({
+          where: {
+            procedureId: {
+              in: procedureIds.map(id => BigInt(id))
+            }
+          },
+          include: {
+            carrier: {
+              select: {
+                id: true,
+                carrierName: true
+              }
+            }
+          }
+        });
+
+        // Create a map of procedure ID to requirements
+        const requirementsByProcedure = new Map();
+        requirements.forEach(req => {
+          const procId = Number(req.procedureId);
+          if (!requirementsByProcedure.has(procId)) {
+            requirementsByProcedure.set(procId, []);
+          }
+          requirementsByProcedure.get(procId).push({
+            id: Number(req.id),
+            requirementType: req.requirementType,
+            description: req.description,
+            carrierId: Number(req.carrierId),
+            carrierName: req.carrier?.carrierName
+          });
+        });
+
+        // Add requirements to each procedure
+        proceduresWithRequirements = procedures.map(proc => ({
+          ...proc,
+          requirements: requirementsByProcedure.get(Number(proc.id)) || []
+        }));
+      }
+
+      // Transform the results
+      return proceduresWithRequirements.map(result => {
+        const searchResult: ProcedureSearchResult = {
+          item: {
+            id: Number(result.id),
+            procedureCode: result.procedure_code,
+            description: result.description,
+            category: result.category
+          },
+          matchType
+        };
+
+        // Add score if available
+        if (result.score !== undefined) {
+          searchResult.score = result.score;
+        }
+
+        // Add requirements if included
+        if (includeRequirements && result.requirements) {
+          searchResult.item.requirements = result.requirements;
+        }
+
+        return searchResult;
+      });
+    } catch (error) {
+      logger.error('Error in procedure code search:', error);
+      throw new Error(`Failed to perform procedure code search: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -58,6 +58,24 @@ export interface ProcedureSearchResult {
   matchType?: string;
 }
 
+export interface CombinedSearchOptions {
+  limit?: number;
+  includeCarriers?: boolean;
+  includeProcedures?: boolean;
+  includeGuidelines?: boolean;
+  includeNetworks?: boolean;
+  minScore?: number;
+  filterCategory?: string;
+}
+
+export interface CombinedSearchResult {
+  carriers: FuzzyMatchResult<any>[];
+  procedures: ProcedureSearchResult[];
+  guidelines: FullTextSearchResult<any>[];
+  networks: FuzzyMatchResult<any>[];
+  totalResults: number;
+}
+
 export class FuzzyMatchingService {
   // Default similarity threshold
   private static readonly DEFAULT_THRESHOLD = 0.3;
@@ -522,6 +540,111 @@ export class FuzzyMatchingService {
     } catch (error) {
       logger.error('Error in full-text search:', error);
       throw new Error(`Failed to perform full-text search: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Combined search across multiple entities (carriers, procedures, guidelines, networks)
+   * Performs parallel searches and combines the results
+   */
+  static async combinedSearch(
+    query: string,
+    options: CombinedSearchOptions = {}
+  ): Promise<CombinedSearchResult> {
+    const {
+      limit = 5,
+      includeCarriers = true,
+      includeProcedures = true,
+      includeGuidelines = true,
+      includeNetworks = true,
+      minScore = 0.3,
+      filterCategory
+    } = options;
+
+    try {
+      // Initialize result containers
+      let carriers: FuzzyMatchResult<any>[] = [];
+      let procedures: ProcedureSearchResult[] = [];
+      let guidelines: FullTextSearchResult<any>[] = [];
+      let networks: FuzzyMatchResult<any>[] = [];
+
+      // Create an array of promises for parallel execution
+      const searchPromises: Promise<void>[] = [];
+
+      // Carrier search
+      if (includeCarriers) {
+        const carrierPromise = this.findCarriersByFuzzyName(query, {
+          limit,
+          threshold: minScore
+        })
+          .then(results => {
+            carriers = results;
+          });
+        searchPromises.push(carrierPromise);
+      }
+
+      // Procedure search
+      if (includeProcedures) {
+        // First try exact/contains search for procedure codes
+        const procedureOptions: ProcedureSearchOptions = {
+          limit,
+          searchType: query.match(/^[A-Za-z0-9]+$/) ? 'contains' : 'fuzzy',
+          minScore,
+          category: filterCategory
+        };
+
+        const procedurePromise = this.findProceduresByCode(query, procedureOptions)
+          .then(results => {
+            procedures = results;
+          });
+        searchPromises.push(procedurePromise);
+      }
+
+      // Guidelines search
+      if (includeGuidelines) {
+        const guidelineOptions: FullTextSearchOptions = {
+          limit,
+          filterCategory,
+          minRank: minScore,
+          includeHighlights: true
+        };
+
+        const guidelinePromise = this.fullTextSearch(query, guidelineOptions)
+          .then(results => {
+            guidelines = results;
+          });
+        searchPromises.push(guidelinePromise);
+      }
+
+      // Network search
+      if (includeNetworks) {
+        const networkPromise = this.findNetworksByFuzzyName(query, {
+          limit,
+          threshold: minScore
+        })
+          .then(results => {
+            networks = results;
+          });
+        searchPromises.push(networkPromise);
+      }
+
+      // Wait for all searches to complete
+      await Promise.all(searchPromises);
+
+      // Calculate total results
+      const totalResults = carriers.length + procedures.length + guidelines.length + networks.length;
+
+      // Return combined results
+      return {
+        carriers,
+        procedures,
+        guidelines,
+        networks,
+        totalResults
+      };
+    } catch (error) {
+      logger.error('Error in combined search:', error);
+      throw new Error(`Failed to perform combined search: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

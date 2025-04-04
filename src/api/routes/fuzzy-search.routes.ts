@@ -98,4 +98,19 @@ router.get('/full-text', FuzzySearchController.fullTextSearch);
  */
 router.get('/procedures/code', FuzzySearchController.findProceduresByCode);
 
+/**
+ * @route   GET /api/fuzzy-search/combined
+ * @desc    Perform combined search across multiple entities (carriers, procedures, guidelines, networks)
+ * @access  Public
+ * @query   {string} query - The search query
+ * @query   {number} [limit=5] - Maximum number of results per entity type
+ * @query   {boolean} [includeCarriers=true] - Include carriers in search results
+ * @query   {boolean} [includeProcedures=true] - Include procedures in search results
+ * @query   {boolean} [includeGuidelines=true] - Include guidelines in search results
+ * @query   {boolean} [includeNetworks=true] - Include networks in search results
+ * @query   {string} [category] - Filter results by category where applicable
+ * @query   {number} [minScore=0.3] - Minimum similarity score threshold
+ */
+router.get('/combined', FuzzySearchController.combinedSearch);
+
 export default router;

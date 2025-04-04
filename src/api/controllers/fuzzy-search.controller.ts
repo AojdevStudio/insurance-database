@@ -308,4 +308,57 @@ export class FuzzySearchController {
       });
     }
   }
+
+  /**
+   * Perform combined search across multiple entities
+   */
+  static async combinedSearch(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        query,
+        limit,
+        includeCarriers,
+        includeProcedures,
+        includeGuidelines,
+        includeNetworks,
+        category,
+        minScore
+      } = req.query;
+
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({ error: 'Query parameter is required' });
+        return;
+      }
+
+      const options = {
+        limit: limit ? Number(limit) : undefined,
+        includeCarriers: includeCarriers !== 'false', // Default to true
+        includeProcedures: includeProcedures !== 'false', // Default to true
+        includeGuidelines: includeGuidelines !== 'false', // Default to true
+        includeNetworks: includeNetworks !== 'false', // Default to true
+        filterCategory: category ? String(category) : undefined,
+        minScore: minScore ? Number(minScore) : undefined
+      };
+
+      const results = await FuzzyMatchingService.combinedSearch(query, options);
+
+      res.json({
+        success: true,
+        results,
+        totalResults: results.totalResults,
+        entityCounts: {
+          carriers: results.carriers.length,
+          procedures: results.procedures.length,
+          guidelines: results.guidelines.length,
+          networks: results.networks.length
+        }
+      });
+    } catch (error) {
+      logger.error('Error in combinedSearch:', error);
+      res.status(500).json({
+        error: 'Failed to perform combined search',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 }

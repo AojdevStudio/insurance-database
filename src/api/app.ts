@@ -13,6 +13,7 @@ import carrierRoutes from './routes/carrier.routes.js';
 import procedureRoutes from './routes/procedure.routes.js';
 import guidelinesRoutes from './routes/guidelines.routes.js';
 import fuzzySearchRoutes from './routes/fuzzy-search.routes.js';
+import dataTransferRoutes from './routes/data-transfer.routes.js';
 import prismaCarrierRoutes from './routes/prisma/carrier.routes.js';
 import prismaProcedureRoutes from './routes/prisma/procedure.routes.js';
 import prismaGuidelinesRoutes from './routes/prisma/guidelines.routes.js';
@@ -81,6 +82,7 @@ app.use('/api/carriers', carrierRoutes);
 app.use('/api/procedures', procedureRoutes);
 app.use('/api/guidelines', guidelinesRoutes);
 app.use('/api/fuzzy-search', fuzzySearchRoutes);
+app.use('/api/data-transfer', dataTransferRoutes);
 
 // Prisma API routes (for testing and comparison)
 app.use('/api/prisma/carriers', prismaCarrierRoutes);

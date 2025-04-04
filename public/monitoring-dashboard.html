@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prisma Migration Monitoring Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+    .card {
+      margin-bottom: 20px;
+    }
+    .performance-good {
+      color: green;
+    }
+    .performance-bad {
+      color: red;
+    }
+    .performance-neutral {
+      color: orange;
+    }
+    .chart-container {
+      height: 300px;
+    }
+    .alert-container {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4">Prisma Migration Monitoring Dashboard</h1>
+    
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Rollout Status</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <strong>Current Phase:</strong> <span id="current-phase">Loading...</span>
+            </div>
+            <div class="mb-3">
+              <strong>Traffic Percentage:</strong> <span id="traffic-percentage">Loading...</span>
+            </div>
+            <div class="mb-3">
+              <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+              </div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <button id="rollback-btn" class="btn btn-warning">Rollback to Old Implementation</button>
+              <button id="advance-btn" class="btn btn-primary">Advance to Next Phase</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Feature Flags</h5>
+          </div>
+          <div class="card-body">
+            <div id="feature-flags">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5>Performance Metrics</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Operation</th>
+                    <th>Old Avg (ms)</th>
+                    <th>Prisma Avg (ms)</th>
+                    <th>Difference</th>
+                    <th>Sample Size</th>
+                  </tr>
+                </thead>
+                <tbody id="metrics-table">
+                  <tr>
+                    <td colspan="5" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5>Data Validation</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Operation</th>
+                    <th>Success Rate</th>
+                    <th>Total Tests</th>
+                    <th>Success</th>
+                    <th>Failure</th>
+                    <th>Latest Result</th>
+                  </tr>
+                </thead>
+                <tbody id="validation-table">
+                  <tr>
+                    <td colspan="6" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5>Recent Alerts</h5>
+          </div>
+          <div class="card-body">
+            <div class="alert-container">
+              <div id="alerts-container">Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script>
+    // API endpoints
+    const API_BASE_URL = '/api';
+    const ROLLOUT_URL = `${API_BASE_URL}/monitoring/rollout`;
+    const FLAGS_URL = `${API_BASE_URL}/monitoring/flags`;
+    const METRICS_URL = `${API_BASE_URL}/monitoring/metrics`;
+    const VALIDATION_URL = `${API_BASE_URL}/monitoring/validation`;
+    const ALERTS_URL = `${API_BASE_URL}/monitoring/alerts`;
+    
+    // Refresh interval (in milliseconds)
+    const REFRESH_INTERVAL = 5000;
+    
+    // Initialize dashboard
+    function initDashboard() {
+      // Load initial data
+      loadRolloutStatus();
+      loadFeatureFlags();
+      loadPerformanceMetrics();
+      loadValidationResults();
+      loadAlerts();
+      
+      // Set up refresh interval
+      setInterval(() => {
+        loadRolloutStatus();
+        loadFeatureFlags();
+        loadPerformanceMetrics();
+        loadValidationResults();
+        loadAlerts();
+      }, REFRESH_INTERVAL);
+      
+      // Set up button event handlers
+      document.getElementById('rollback-btn').addEventListener('click', rollbackToOldImplementation);
+      document.getElementById('advance-btn').addEventListener('click', advanceToNextPhase);
+    }
+    
+    // Load rollout status
+    async function loadRolloutStatus() {
+      try {
+        const response = await fetch(ROLLOUT_URL);
+        const data = await response.json();
+        
+        if (data.success) {
+          document.getElementById('current-phase').textContent = `Phase ${data.currentPhase}`;
+          document.getElementById('traffic-percentage').textContent = `${data.trafficPercentage}%`;
+          
+          // Update progress bar
+          const progressBar = document.getElementById('progress-bar');
+          progressBar.style.width = `${data.trafficPercentage}%`;
+          progressBar.setAttribute('aria-valuenow', data.trafficPercentage);
+          progressBar.textContent = `${data.trafficPercentage}%`;
+        }
+      } catch (error) {
+        console.error('Error loading rollout status:', error);
+      }
+    }
+    
+    // Load feature flags
+    async function loadFeatureFlags() {
+      try {
+        const response = await fetch(FLAGS_URL);
+        const data = await response.json();
+        
+        if (data.success) {
+          const flagsContainer = document.getElementById('feature-flags');
+          flagsContainer.innerHTML = '';
+          
+          for (const [flag, value] of Object.entries(data.flags)) {
+            const flagElement = document.createElement('div');
+            flagElement.className = 'form-check form-switch mb-2';
+            
+            const input = document.createElement('input');
+            input.className = 'form-check-input';
+            input.type = 'checkbox';
+            input.id = `flag-${flag}`;
+            input.checked = value;
+            input.addEventListener('change', () => updateFeatureFlag(flag, input.checked));
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.htmlFor = `flag-${flag}`;
+            label.textContent = flag;
+            
+            flagElement.appendChild(input);
+            flagElement.appendChild(label);
+            flagsContainer.appendChild(flagElement);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading feature flags:', error);
+      }
+    }
+    
+    // Load performance metrics
+    async function loadPerformanceMetrics() {
+      try {
+        const response = await fetch(METRICS_URL);
+        const data = await response.json();
+        
+        if (data.success) {
+          const metricsTable = document.getElementById('metrics-table');
+          metricsTable.innerHTML = '';
+          
+          if (Object.keys(data.metrics).length === 0) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 5;
+            cell.className = 'text-center';
+            cell.textContent = 'No metrics available';
+            row.appendChild(cell);
+            metricsTable.appendChild(row);
+            return;
+          }
+          
+          for (const [operation, metrics] of Object.entries(data.metrics)) {
+            const row = document.createElement('tr');
+            
+            // Operation name
+            const nameCell = document.createElement('td');
+            nameCell.textContent = operation;
+            row.appendChild(nameCell);
+            
+            // Old average
+            const oldAvgCell = document.createElement('td');
+            oldAvgCell.textContent = metrics.oldAvg.toFixed(2);
+            row.appendChild(oldAvgCell);
+            
+            // Prisma average
+            const prismaAvgCell = document.createElement('td');
+            prismaAvgCell.textContent = metrics.newAvg.toFixed(2);
+            row.appendChild(prismaAvgCell);
+            
+            // Difference
+            const diffCell = document.createElement('td');
+            const diffText = `${metrics.diffPercent.toFixed(2)}%`;
+            diffCell.textContent = diffText;
+            
+            if (metrics.isFaster) {
+              diffCell.className = 'performance-good';
+              diffCell.textContent = `${diffText} faster`;
+            } else if (metrics.diffPercent < -10) {
+              diffCell.className = 'performance-bad';
+              diffCell.textContent = `${Math.abs(metrics.diffPercent).toFixed(2)}% slower`;
+            } else {
+              diffCell.className = 'performance-neutral';
+              diffCell.textContent = `${Math.abs(metrics.diffPercent).toFixed(2)}% slower`;
+            }
+            
+            row.appendChild(diffCell);
+            
+            // Sample size
+            const sampleCell = document.createElement('td');
+            sampleCell.textContent = `Old: ${metrics.sampleSize.old}, Prisma: ${metrics.sampleSize.new}`;
+            row.appendChild(sampleCell);
+            
+            metricsTable.appendChild(row);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading performance metrics:', error);
+      }
+    }
+    
+    // Load validation results
+    async function loadValidationResults() {
+      try {
+        const response = await fetch(VALIDATION_URL);
+        const data = await response.json();
+        
+        if (data.success) {
+          const validationTable = document.getElementById('validation-table');
+          validationTable.innerHTML = '';
+          
+          if (Object.keys(data.summary).length === 0) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 6;
+            cell.className = 'text-center';
+            cell.textContent = 'No validation results available';
+            row.appendChild(cell);
+            validationTable.appendChild(row);
+            return;
+          }
+          
+          for (const [operation, results] of Object.entries(data.summary)) {
+            const row = document.createElement('tr');
+            
+            // Operation name
+            const nameCell = document.createElement('td');
+            nameCell.textContent = operation;
+            row.appendChild(nameCell);
+            
+            // Success rate
+            const rateCell = document.createElement('td');
+            rateCell.textContent = `${results.successRate.toFixed(2)}%`;
+            
+            if (results.successRate === 100) {
+              rateCell.className = 'performance-good';
+            } else if (results.successRate >= 90) {
+              rateCell.className = 'performance-neutral';
+            } else {
+              rateCell.className = 'performance-bad';
+            }
+            
+            row.appendChild(rateCell);
+            
+            // Total tests
+            const totalCell = document.createElement('td');
+            totalCell.textContent = results.totalTests;
+            row.appendChild(totalCell);
+            
+            // Success count
+            const successCell = document.createElement('td');
+            successCell.textContent = results.successCount;
+            row.appendChild(successCell);
+            
+            // Failure count
+            const failureCell = document.createElement('td');
+            failureCell.textContent = results.failureCount;
+            row.appendChild(failureCell);
+            
+            // Latest result
+            const latestCell = document.createElement('td');
+            latestCell.textContent = results.latestResult.match ? 'Success' : 'Failure';
+            latestCell.className = results.latestResult.match ? 'performance-good' : 'performance-bad';
+            row.appendChild(latestCell);
+            
+            validationTable.appendChild(row);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading validation results:', error);
+      }
+    }
+    
+    // Load alerts
+    async function loadAlerts() {
+      try {
+        const response = await fetch(`${ALERTS_URL}?limit=10`);
+        const data = await response.json();
+        
+        if (data.success) {
+          const alertsContainer = document.getElementById('alerts-container');
+          alertsContainer.innerHTML = '';
+          
+          if (data.alerts.length === 0) {
+            alertsContainer.textContent = 'No alerts available';
+            return;
+          }
+          
+          for (const alert of data.alerts) {
+            const alertElement = document.createElement('div');
+            
+            // Set alert class based on severity
+            let alertClass = 'alert-info';
+            if (alert.severity === 'warning') {
+              alertClass = 'alert-warning';
+            } else if (alert.severity === 'error' || alert.severity === 'critical') {
+              alertClass = 'alert-danger';
+            }
+            
+            alertElement.className = `alert ${alertClass} mb-2`;
+            
+            // Format timestamp
+            const timestamp = new Date(alert.timestamp).toLocaleString();
+            
+            // Create alert content
+            alertElement.innerHTML = `
+              <div><strong>${timestamp}</strong> [${alert.source}]</div>
+              <div>${alert.message}</div>
+            `;
+            
+            alertsContainer.appendChild(alertElement);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading alerts:', error);
+      }
+    }
+    
+    // Update feature flag
+    async function updateFeatureFlag(flagName, value) {
+      try {
+        const response = await fetch(`${FLAGS_URL}/${flagName}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ value })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          console.error('Error updating feature flag:', data.error);
+          // Reset the checkbox to its previous state
+          document.getElementById(`flag-${flagName}`).checked = !value;
+        }
+      } catch (error) {
+        console.error('Error updating feature flag:', error);
+        // Reset the checkbox to its previous state
+        document.getElementById(`flag-${flagName}`).checked = !value;
+      }
+    }
+    
+    // Rollback to old implementation
+    async function rollbackToOldImplementation() {
+      if (!confirm('Are you sure you want to rollback to the old implementation?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${ROLLOUT_URL}/rollback`, {
+          method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          alert('Successfully rolled back to old implementation');
+          loadRolloutStatus();
+          loadFeatureFlags();
+        } else {
+          alert(`Failed to rollback: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('Error rolling back:', error);
+        alert('Failed to rollback: Network error');
+      }
+    }
+    
+    // Advance to next phase
+    async function advanceToNextPhase() {
+      if (!confirm('Are you sure you want to advance to the next phase?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${ROLLOUT_URL}/advance`, {
+          method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(`Successfully advanced to phase ${data.phase}`);
+          loadRolloutStatus();
+          loadFeatureFlags();
+        } else {
+          alert(`Failed to advance: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('Error advancing phase:', error);
+        alert('Failed to advance: Network error');
+      }
+    }
+    
+    // Initialize dashboard when the page loads
+    document.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>

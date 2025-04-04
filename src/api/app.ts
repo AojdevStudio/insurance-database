@@ -9,11 +9,17 @@ import { monitor } from './middleware/monitoring.js';
 import { ApiKeyService } from '../services/apiKey.service.js';
 import { RateLimitService } from '../services/rateLimit.service.js';
 import { AuditLogService } from '../services/auditLog.service.js';
+import { FeatureFlagService } from '../services/feature-flag.service';
+import { RollbackService } from '../services/rollback.service';
+import { AlertService } from '../services/alert.service';
+import { addRequestId, measurePerformance, clearRequestFlags } from '../middleware/performance.middleware';
+import { splitTraffic } from '../middleware/traffic-splitter.middleware';
 import carrierRoutes from './routes/carrier.routes.js';
 import procedureRoutes from './routes/procedure.routes.js';
 import guidelinesRoutes from './routes/guidelines.routes.js';
 import fuzzySearchRoutes from './routes/fuzzy-search.routes.js';
 import dataTransferRoutes from './routes/data-transfer.routes.js';
+import monitoringRoutes from './routes/monitoring.routes.js';
 import prismaCarrierRoutes from './routes/prisma/carrier.routes.js';
 import prismaProcedureRoutes from './routes/prisma/procedure.routes.js';
 import prismaGuidelinesRoutes from './routes/prisma/guidelines.routes.js';
@@ -26,6 +32,11 @@ const app = express();
 const apiKeyService = new ApiKeyService(supabase);
 const rateLimitService = new RateLimitService(supabase);
 const auditLogService = new AuditLogService(supabase);
+
+// Initialize feature flags and rollout services
+FeatureFlagService.initialize();
+RollbackService.initialize();
+AlertService.initialize();
 
 // Security middleware
 app.use(helmet({
@@ -63,18 +74,35 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
+// Request ID middleware (must be first)
+app.use(addRequestId);
+
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Traffic splitting middleware
+app.use(splitTraffic());
+
+// Performance monitoring middleware
+app.use(measurePerformance('api_request'));
 
 // API security middleware
 app.use(validateApiKey(apiKeyService));
 app.use(rateLimit(rateLimitService));
 app.use(monitor(auditLogService));
 
+// Request cleanup middleware (must be after all other middleware)
+app.use(clearRequestFlags);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Serve monitoring dashboard
+app.get('/monitoring-dashboard', (req, res) => {
+  res.sendFile('monitoring-dashboard.html', { root: 'public' });
 });
 
 // API routes
@@ -83,6 +111,7 @@ app.use('/api/procedures', procedureRoutes);
 app.use('/api/guidelines', guidelinesRoutes);
 app.use('/api/fuzzy-search', fuzzySearchRoutes);
 app.use('/api/data-transfer', dataTransferRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 
 // Prisma API routes (for testing and comparison)
 app.use('/api/prisma/carriers', prismaCarrierRoutes);

@@ -9,38 +9,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         node-version: [18.x]
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    
+
     - name: Install dependencies
       run: npm ci
-    
+
     - name: Generate Prisma Client
       run: npm run prisma:generate
-    
+
     - name: Lint
       run: npm run lint
-    
+
     - name: Build
       run: npm run build
-    
+
     - name: Test
       run: npm test
-      
+
     - name: Run Prisma-specific tests
       run: npm run test:prisma
-    
+
     - name: Cache build artifacts
       uses: actions/cache@v3
       with:
@@ -55,16 +55,16 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Use Node.js 18.x
       uses: actions/setup-node@v3
       with:
         node-version: 18.x
         cache: 'npm'
-    
+
     - name: Restore cached build artifacts
       uses: actions/cache@v3
       with:
@@ -72,32 +72,15 @@ jobs:
           dist
           node_modules/.prisma
         key: ${{ runner.os }}-build-${{ github.sha }}
-    
+
     - name: Install dependencies
       run: npm ci
-    
-    - name: Validate database connection
-      run: |
-        # Create a temporary validation script
-        echo "import { PrismaClient } from '@prisma/client'; 
-        const prisma = new PrismaClient();
-        async function validateConnection() {
-          try {
-            await prisma.$connect();
-            console.log('Database connection successful');
-            process.exit(0);
-          } catch (error) {
-            console.error('Database connection failed:', error);
-            process.exit(1);
-          } finally {
-            await prisma.$disconnect();
-          }
-        }
-        validateConnection();" > validate-db.js
-        node validate-db.js
+
+    - name: Initialize and Validate Database
+      run: node scripts/ci-db-init.js
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    
+
     # Add your deployment steps here
     # - name: Deploy to production
     #   run: npm run deploy

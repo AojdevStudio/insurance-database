@@ -12,47 +12,29 @@ on:
 jobs:
   validate-schema:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Use Node.js 18.x
       uses: actions/setup-node@v3
       with:
         node-version: 18.x
         cache: 'npm'
-    
+
     - name: Install dependencies
       run: npm ci
-    
-    - name: Validate Prisma Schema
-      run: |
-        # Create a temporary validation script
-        echo "import { PrismaClient } from '@prisma/client'; 
-        const prisma = new PrismaClient();
-        async function validateSchema() {
-          try {
-            // Test a simple query to validate schema
-            await prisma.carrier.findFirst();
-            console.log('Schema validation successful');
-            process.exit(0);
-          } catch (error) {
-            console.error('Schema validation failed:', error);
-            process.exit(1);
-          } finally {
-            await prisma.$disconnect();
-          }
-        }
-        validateSchema();" > validate-schema.js
-        node validate-schema.js
+
+    - name: Initialize and Validate Database
+      run: node scripts/ci-db-init.js
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    
+
     - name: Check for Schema Drift
       run: |
         # Pull the current schema from the database and compare with the committed schema
         npx prisma db pull --schema=prisma/temp-schema.prisma
-        
+
         # Compare schemas (simplified comparison)
         if diff -q prisma/schema.prisma prisma/temp-schema.prisma > /dev/null; then
           echo "No schema drift detected"
